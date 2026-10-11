@@ -675,7 +675,8 @@ class Parser:
 # --------------------------------------------------------------------------- driver
 
 def parse_file(path, defines):
-    raw = open(path, 'rb').read().decode('latin1')
+    with open(path, 'rb') as source:
+        raw = source.read().decode('latin1')
     lines, includes, macros = preprocess(raw, set(defines))
     toks = lex(lines)
     ast = Parser(toks, path).file()
@@ -698,7 +699,8 @@ def main(argv):
         try:
             parse_file(f, defines)
             ok += 1
-            total_lines += open(f, 'rb').read().count(b'\n')
+            with open(f, 'rb') as source:
+                total_lines += source.read().count(b'\n')
         except SyntaxError as e:
             fail += 1
             print('FAIL', e)

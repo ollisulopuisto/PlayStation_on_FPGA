@@ -1,5 +1,12 @@
 # P00 build recovery — dependency status and plan
 
+**Current update (2026-10-12):** the self-written compiler now generates both
+real cache sources with behavioral/mutation tests. It is still experimental;
+sequential oracle equivalence and hierarchy linking are the next hard jobs.
+See [POCKET_SFLC.md](POCKET_SFLC.md) and the refreshed
+[checkpoint](POCKET_START_HERE.md). The dated sections below are recovery history.
+
+
 Checked 2026-10-11. Evidence is from GitHub API queries and web search; pgate1.at-ninja.jp could not be fetched from this session.
 
 ## Snapshot identity
@@ -75,3 +82,36 @@ Not accepted, so these must be what `sflp` rewrites:
 The archived sfl2vl cannot build the large modules (R3000A, GTE, GPU, CDROM, core) under the 500-line limit. It is still valuable as a **reference oracle**: any self-written SFL+ to Verilog compiler can be checked against it on small probes and on the real modules that stay under 500 lines.
 
 Parser spike: `tools/sflc/sflp_parse.py` parses all 44 `.sflp` files (16,152 lines). Construct counts: 108 stages, 306 states, 359 `instruct`, 189 `generate`, 382 `goto`, 30 `switch`, 36 generators.
+
+## Milestone 1: own SFL+ combinational subset (2026-10-11)
+
+`tools/sflc/sflc.py` (uses `sflp_parse.py`) translates combinational SFL+ circuits to Verilog. Verified against sfl2vl 20100412 output by random co-simulation in Icarus (4000 vectors each, `$S/cosim/cosim.py`):
+
+- PASS: p01_ifelse, p03_sel, p04_ops, p09_prec, p11_pp, p12_unops, p14_any_alt, p16_circuit_kw, real bsr_s16 (`bsr_s16.sflp`, 4000 vectors each)
+- Skipped (sequential reference, not compared): p07_init, q_lines00400
+
+Operator rules confirmed from the reference: `@` is binary XOR; unary `^` is bitwise NOT; `N#x` sign-extends `x` to N bits, where `x` is a name or a constant slice of a name.
+
+`any`/`alt` semantics (from p14 reference): `any` arms are independent (each guard ORed in; `else` = no arm matched). `alt` is first-match priority. `alt` without `else` is rejected as unverified.
+
+`instrin name(args)`: the reference (bsr_s16) turns it into a 1-bit input port `name`; the args stay the circuit's own ports and add no logic.
+
+Not supported (fails loudly with NotImplementedError): `instrout/instrself` (no reference output yet), `switch`, `inst` submodules, `mem`, stages/states, indexed assignment targets, generators, `alt` without `else`. p15 is out of scope.
+
+Limits: the generator is not a replacement for sfl2vl's output format; only functional equivalence on the probes is checked.
+
+## Milestone 2: sequential blocks and cache validation (2026-10-12)
+
+`tools/sflc/sflc.py` now lowers reset variants, register/memory updates, local
+control calls and arguments, lexical locals, switch and one-task stages. It
+emits SystemVerilog and optional conflict/regeneration assertions. The actual
+cache sources pass suffix-fill, alignment, replacement and reset fixtures;
+reverting either original offset fix is detected. The previous nine
+combinational reference comparisons still pass. No sequential equivalence or
+complete Pocket build is claimed.
+
+Run `python3 tools/sflc/tests/run_tests.py`; detailed results, semantic limits,
+and the next L3 work sequence are in [POCKET_SFLC.md](POCKET_SFLC.md).
+The rejected native `p13_stage` was never a stage oracle. New p17–p19 probes
+remove its invalid input-terminal `instr_arg` declaration; independent archived
+compiler runs remain pending.

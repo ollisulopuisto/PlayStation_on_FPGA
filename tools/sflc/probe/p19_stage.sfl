@@ -1,0 +1,22 @@
+// Corrected oracle probe: instr_arg on instrin caused p13 to be rejected.
+circuit p19 {
+    input din<8>;
+    instrin start, advance;
+    output busy, dout<8>;
+    instrout done;
+    reg_wr acc<8>;
+    reg_wr dreg<8>;
+    stage_name work { task do(dreg); }
+    busy = work.do;
+    dout = acc;
+    instruct start generate work.do(din);
+    stage work {
+        state_name s0, s1;
+        first_state s0;
+        state s0 if(advance) par { acc := dreg; goto s1; }
+        state s1 if(advance) par {
+            acc := acc + 0x01;
+            done(); goto s0; finish;
+        }
+    }
+}

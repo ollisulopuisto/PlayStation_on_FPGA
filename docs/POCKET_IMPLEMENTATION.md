@@ -1,4 +1,35 @@
-# Implementation checkpoint — 2026-10-11
+# Implementation checkpoint — 2026-10-12
+
+## Latest work: experimental compiler and actual-source cache validation
+
+See [POCKET_SFLC.md](POCKET_SFLC.md) for the detailed implementation boundary,
+commands, results and remaining semantic risks. `tools/sflc/sflc.py` now supports
+registers, local control terminals/arguments, memories, lexical locals, switch and
+single-task stages in addition to the earlier combinational subset.
+
+- `python3 tools/sflc/tests/run_tests.py`: **nine groups PASS**, including 4,000
+  sequential cycles, 65,536 numerical vectors, 242 actual-source cache checks,
+  detection of both independently reverted suffix-validity fixes, and 19 real
+  leaf-module elaborations.
+- `tools/sflc/cosim.py`: **nine existing combinational oracle cases PASS**, 4,000
+  vectors each (seed 1). Reference artifacts remain external.
+- Both generated caches: **Verilator 5.052 lint PASS, no warnings**.
+- New native probes p17–p19 await independent sequential reference runs.
+- `.github/workflows/sflc.yml` was added; remote execution is not claimed.
+
+No SFL source bytes or live Pocket RTL were changed by the 2026-10-12 work.
+No source-to-bitstream build, synthesis, timing or FPS measurement was performed.
+P02 now has experimental-compiler behavioral evidence; it is not fully qualified.
+P00/P04 remain open. The working directory is a Git checkout; no commit or push
+was made in this session.
+
+## Historical implementation record — 2026-10-11
+
+The sections below preserve earlier evidence. Statements such as "not a Git
+checkout", "no simulation", "switch left for a stronger model", and unavailable
+Verilator describe earlier checkpoints, not the current state. Current status is
+[POCKET_START_HERE.md](POCKET_START_HERE.md).
+
 
 ## Saved changes
 
@@ -62,3 +93,57 @@ Covered: N clients with random requests (len 0–15, even/odd addresses, random/
 Results: **PASS** for N/URGENT_MAX/TAGW = 1/0/1, 2/1/2, 6/4/3, 7/1/5, 3/8/4, each with seeds 1–4 at +cycles=3000; default config also passed at 6000 cycles. Max observed wait equalled the proposed bound N·(URGENT_MAX+1)−1 in every config (the bound is tight, not violated). Five hand-made mutants (adapter odd-shift removed, zero-mask word not skipped, address limit off by one, urgent counter not reset, fair pointer not advanced) were each caught.
 
 **No RTL bug was found.** Not covered: fabric `b_rsp_valid` without a request (not reachable via the frontend), controller-specific timing (refresh, turnaround), reads with latency overlapping a following command (adapter issues one read at a time), CDC, synthesis, timing, bandwidth. Fairness bound is in selections, not cycles. Wall time was not measured (`/usr/bin/time -l` is blocked here).
+
+## Non-blocked Pocket items — 2026-10-11 (Icarus 13.0)
+
+Status: items 1–3 and 5 done; item 4 fetch script done, distribution licence decision open; `switch` work left for a stronger model.
+
+### 1. `ram_320x240x15_dp` replacement
+
+- RTL: `Pocket/rtl/ram_320x240x15_dp.sv`. Bench: `Pocket/tb/tb_ram_320x240x15_dp.sv`.
+- Run from the project root:
+  `iverilog -g2012 -s tb_ram_320x240x15_dp -o tb.vvp Pocket/rtl/ram_320x240x15_dp.sv Pocket/tb/tb_ram_320x240x15_dp.sv && vvp tb.vvp +seed=3`
+- Result: `PASS tb_ram_320x240x15_dp: 150351 reads checked, 200000 ops, 0 errors`
+- Assumptions: port names are guessed because the sfl-generated `.h` is not in the repository. Read is registered (one cycle). Same-address read/write returns the old value. The 17-bit address is used as-is (depth 76800).
+
+### 2. Async SRAM controller (`sram_ctrl`)
+
+- RTL: `Pocket/rtl/sram_ctrl.sv`. Bench: `Pocket/tb/tb_sram_ctrl.sv`.
+- Run: `iverilog -g2012 -s tb_sram_ctrl -o tb.vvp Pocket/rtl/sram_ctrl.sv Pocket/tb/tb_sram_ctrl.sv && vvp tb.vvp +seed=3 +ops=4000`
+- Result: `PASS tb_sram_ctrl: 4002 commands, 0 errors`
+- Timing (one clock per phase): read = address and OEn at T, sample Dout at T+2, ack at T+3. Write = address, Din and DEn at T, WEn low for one clock, DEn released and ack at T+3. UBn and LBn are held low.
+- Assumptions, not verified against the real device:
+  - Interface matches the generated `sram.read/write/ack/dout` calls only by guess.
+  - Clock period and SRAM access/pulse timings are not checked against the datasheet or the actual SRAM clock.
+  - SRAM size: resolved. `core_top.v` has `sram_a[16:0]` and `sram_dq[15:0]`, which is 128K × 16 = 256 KiB, matching the docs. The earlier "1M × 16" label was wrong; the bench already uses `WORDS = 1 << 17`.
+  - `rd_req` wins if both requests are high. Requests are ignored while busy.
+
+### 3. `vjtag_uart` recovery
+
+- Copied to `hdl/USB-JTAG/DE0-CV/`: `vjtag_uart.h`, `vjtag_uart.v`, `VirtualJTAG.v`, `LICENSE_USB-Blaster_UART`.
+- Source: `pgate1/USB-Blaster_UART` (master), MIT, Copyright 2019 pgate1. Licence verified via the GitHub API.
+- Syntax check: iverilog with a stub `sld_virtual_jtag`. Only warnings were the missing timescale and a floating `ir_out` port, both present upstream. The real `sld_virtual_jtag` is a Quartus-only primitive and was **not** simulated.
+- **Fixed:** `Pocket/core.sflp` line 13 now includes `../hdl/USB-JTAG/DE0-CV/vjtag_uart.h` (was `../../../…`, which resolved outside the repo).
+
+### 4. APF shell — fetch-at-build, licence decision open
+
+- `open-fpga/core-template` `src/fpga/apf/*` and `src/fpga/core/core_bridge_cmd.v` carry Analogue's Software License Agreement, not MIT. It grants no redistribution right. **Nothing is committed.**
+- `tools/apf/fetch_apf.sh` downloads 13 files from core-template at pinned revision `da3a021b1eaf742604d86d8dc9b33a6666263e6a`. Each file is checked against a pinned SHA-256, and the files go to `Pocket/build/apf/`, which is gitignored. Re-running uses the cache.
+- Public precedent: the Neo Geo core `Mazamars312/Analogue_Pocket_Neogeo` (HEAD `988163bc…`) vendors the same APF files. That shows practice, not licence compatibility.
+- Deferred: no release build is planned. A built core zip or bitstream containing APF-derived code is a distribution question for later.
+
+### Open
+
+- `switch`, instrout/instrself, stages/states and `mem` in `Pocket/core.sflp` remain for a stronger model.
+- Route 2 (Overtone licence) is undecided; the P00 build is blocked on it.
+- No commits or pushes have been made.
+
+### 5. P04 controller — imported unchanged, not adapted
+
+- Copied from MIRLO64 HEAD `23d8dea926ece5877262abb414497bc6ddf06e7d` to `hdl/SDRAM/MIRLO64/` (earlier notes cited `1ab630b…`; the copied revision is the one above):
+  - `sdr_ctrl.sv` SHA-256 `cc1d5b18639d52fd6e35cd18380ebd6e2341b2ebbb89d1a861a36d45b51de46b` (Apache-2.0, `LICENSE-APACHE-2.0`).
+  - `sdr_phy.sv` SHA-256 `84a2a16106dd570cd74b0b2b8d051f98f236d6157df81cab6971327408457ee9` (LiteX-derived, BSD 2-Clause, `LICENSE-LITEX-BSD-2-CLAUSE`).
+- `LICENSE-LITEX-BSD-2-CLAUSE` is LiteX's upstream `LICENSE` file verbatim (SHA-256 `8371c1e1e72db0c21eba5acfec4f4f8597dc8555bd282b2a35ccbbde992675c5`), replacing an earlier hand-written copy.
+- Check: `iverilog -g2012 sdr_ctrl.sv` elaborates (iverilog warns about constant selects in `always_*`). `sdr_phy.sv` fails elaboration on `ALTDDIO_OUT`, which is Quartus-only, as expected.
+- Not adapted. The donor is 32-bit word, 62.832 MHz, and tuned to board timing. The PS1 wrapper needs 16-bit addressing and 128-bit returns, and the clock ratio must be retimed. None of that can be verified without hardware.
+- Details are in `hdl/SDRAM/MIRLO64/README.md`.

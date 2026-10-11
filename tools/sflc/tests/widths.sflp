@@ -1,0 +1,14 @@
+circuit widths {
+    input a<8>, b<8>;
+    output carry, low<8>, reversed<8>, signed_a<16>, signed_part<16>;
+    output negative<8>, shifted<8>, sign_constant<16>, choose<4>;
+    carry = ((0b0 || a) + (0b0 || b))<8>;
+    low = (a+b)<7:0>;
+    reversed = a<0:7>;
+    signed_a = 16#a;
+    signed_part = 16#a<6:2>;
+    negative = -a;
+    shifted = a >> b;
+    sign_constant = 16#0x8;
+    alt { a<0>: choose=9; a<1>: choose=5; }
+}

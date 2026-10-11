@@ -1,0 +1,50 @@
+circuit sequential {
+    input en, mode<2>, a<8>, addr<3>, rd, wr, start, tick;
+    output value<8>, set_value<4>, initialized<4>, memq<8>;
+    output left<8>, right<8>, busy, result<8>;
+    instrout done;
+    reg_wr r<8>;
+    reg_ws ones<4>;
+    reg initial_value<4> = 5;
+    reg q<8>;
+    mem cells[8]<8> = {0x10, 0x20};
+    instrself load(arg);
+    sel arg<8>;
+    reg_wr payload<8>, result_reg<8>;
+    stage_name work { task do(payload); }
+    value = r;
+    set_value = ones;
+    initialized = initial_value;
+    memq = q;
+    busy = work.do;
+    result = result_reg;
+    instruct load r := arg;
+    if(en) switch(mode) {
+        case 0: r++;
+        case 1: load(a);
+        case 2: r--;
+        default: r @= a;
+    }
+    if(wr) cells[addr] := a;
+    if(rd) q := cells[addr];
+    if(a<0>) {
+        reg_wr local<8>;
+        local++;
+        left = local;
+    } else {
+        // Same spelling, independent persistent register and implicit zero left.
+        reg_wr local<8>;
+        local += 2;
+        right = local;
+    }
+    if(start) generate work.do(a);
+    stage work {
+        first_state first;
+        state first {
+            if(tick) { result_reg := payload; goto last; }
+        }
+        state last {
+            if(tick) { result_reg++; done(); goto first; finish; }
+        }
+    }
+}

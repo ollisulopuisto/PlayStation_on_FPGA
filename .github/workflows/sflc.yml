@@ -1,0 +1,27 @@
+name: Experimental SFL compiler regression
+on:
+  push:
+    paths:
+      - 'tools/sflc/**'
+      - 'Cache_IR.sflp'
+      - 'Cache_Texture.sflp'
+      - '.github/workflows/sflc.yml'
+  pull_request:
+    paths:
+      - 'tools/sflc/**'
+      - 'Cache_IR.sflp'
+      - 'Cache_Texture.sflp'
+      - '.github/workflows/sflc.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  block-regression:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install simulator
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq iverilog
+      - name: Validate experimental compiler and generated caches
+        run: python3 tools/sflc/tests/run_tests.py

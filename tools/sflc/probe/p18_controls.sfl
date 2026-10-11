@@ -1,0 +1,13 @@
+// Native-SFL spelling of the p06 SFL+ instruction-argument probe.
+circuit p18 {
+    input a<8>;
+    instrin go;
+    output o<8>;
+    instrout req;
+    instrself inner;
+    sel t<8>;
+    instr_arg req(o);
+    instr_arg inner(t);
+    instruct go inner(a);
+    instruct inner req(t);
+}

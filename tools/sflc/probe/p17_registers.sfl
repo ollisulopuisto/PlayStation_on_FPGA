@@ -1,0 +1,15 @@
+// Native-SFL oracle input: no instr_arg declaration on input terminals.
+circuit p17 {
+    input a<8>;
+    instrin load, up, down;
+    output y<8>, set_value<4>, init_value<4>;
+    reg_wr r<8>;
+    reg_ws ones<4>;
+    reg init<4> = 5;
+    y = r;
+    set_value = ones;
+    init_value = init;
+    instruct load r := a;
+    instruct up r++;
+    instruct down r--;
+}
