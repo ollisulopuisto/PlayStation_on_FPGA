@@ -2,7 +2,7 @@ name: sfl2vl probe
 on:
   workflow_dispatch:
   push:
-    branches: [pocket-work]
+    branches: [pocket-work, sfl-oracle-20261012]
     paths: ['tools/sflc/**', '.github/workflows/sfl2vl.yml']
 permissions:
   contents: read
