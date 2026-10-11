@@ -2,8 +2,8 @@ circuit p00 {
 	input a<8>, b<8>;
 	output y<8>;
 	instrin go;
-	instr_arg go(a, b);
 	reg_wr r<8>;
+	instr_arg go(a, b);
 	instruct go par { r := a + b; }
 	y = r;
 }

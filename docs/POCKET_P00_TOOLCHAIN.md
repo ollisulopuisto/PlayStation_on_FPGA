@@ -46,3 +46,32 @@ Directory layout implied by include paths: `<root>/hdl/USB-JTAG/DE0-CV/`, `<root
 4. **Abandon SFL for new work:** keep SFL modules frozen as generated Verilog (needs 1 or 2 once) and write all new blocks in SystemVerilog. Already the roadmap's direction.
 
 Recommendation: route 1 now; start route 3 only as a parser feasibility spike (parse all 13.7k lines, enumerate constructs) if route 1 gets no answer.
+
+## Update 2026-10-11 (later): sfl2vl recovered, evaluation-limited
+
+- **Binary:** `sfl2vlbin-i386-linux-20100412.tar.gz` (SHA-256 `b67fd7216f5f5ca4222ef77a7d68c1c1e19dd45ebf6f5ad5e0522668f57724c1`), archived by the Wayback Machine from `overtone.co.jp/binaries/`. Contains `sfl2vlbin.exe` (i386 ELF, needs only libc), `sflpp.exe` (handles `%i`, `%d`, `#ifdef`), and the `sfl2vl`/`sfl2declare` wrapper scripts. `sfl2declare` = `sfl2vlbin.exe -declare`, which generates the `.h` interface files.
+- **Where it runs:** GitHub Actions `ubuntu-22.04` with `libc6:i386`. Workflow `.github/workflows/sfl2vl.yml` on the public fork `ollisulopuisto/PlayStation_on_FPGA` (branch `pocket-work`). It downloads the binary at run time and checks its hash; the binary is not committed or uploaded.
+- **License:** no license file, so evaluation mode. **Hard limit: 500 input lines** ("Number of lines is over!" at line 499). Do not try to work around it. Generated files say they may be used for educational/personal projects. A non-profit license (reportedly 2,000 lines) or a paid license would have to come from Overtone/IP ARCH.
+- Also archived: `ip-arch.jp/binaries/sfl2vlwin.zip` (Windows MSI, 2004), not tested.
+
+### Probe results (`tools/sflc/probe`, run 38168699381)
+
+Accepted natively by sfl2vl 20100412: `if/else`, `sel`, binary `-`, `!=`, `++`/`--`, `reg x<n> = v`, `mem ... = {0}`, `%d`, `#ifdef`, `N#`, `/|`, `@`, `any/alt ... else`, `declare ... interface`, `circuit`/`module`.
+
+**Operator semantics:** strictly left to right, no precedence: `a || b + c` becomes `({a,b})+c`, `c==d & e<0>` becomes `((c)==(d))&(e[0])`. This matches pgate1's code (e.g. `CDROM_controller.sflp:408` min*60+sec, GTE `(MAC1||0x000)+x`). Only 14 unparenthesized mixed-operator chains exist in the sources.
+
+Not accepted, so these must be what `sflp` rewrites:
+- declarations after use (sfl2vl is single-pass: `instr_arg` must follow all declarations; task arguments must be declared before `stage_name`)
+- `instrin/instrout/instrself name(args)`, which becomes a declaration plus `instr_arg`
+- `switch/case/default`
+- `+=`, `-=`, `&=`, `|=`
+- `par/alt/any/join(i=0;i<N;i++)` generators (index `i` acts as a constant of width ceil(log2 N); `ch[i]` becomes `ch_00`..)
+- states used without `state_name`
+- declarations, submodule instances and `instruct` nested inside blocks/stages/`if`
+- string constants (`"FPGA"`)
+
+### Consequence
+
+The archived sfl2vl cannot build the large modules (R3000A, GTE, GPU, CDROM, core) under the 500-line limit. It is still valuable as a **reference oracle**: any self-written SFL+ to Verilog compiler can be checked against it on small probes and on the real modules that stay under 500 lines.
+
+Parser spike: `tools/sflc/sflp_parse.py` parses all 44 `.sflp` files (16,152 lines). Construct counts: 108 stages, 306 states, 359 `instruct`, 189 `generate`, 382 `goto`, 30 `switch`, 36 generators.

@@ -408,7 +408,9 @@ class Parser:
             self.eat(')')
             a = self.action()
             e = None
-            if self.accept('else'):
+            # 'else :' belongs to an enclosing any/alt, not to this if
+            if self.at('else') and not (self.peek().kind == 'op' and self.peek().val == ':'):
+                self.eat('else')
                 e = self.action()
                 STATS['if-else'] += 1
             STATS['if'] += 1
@@ -569,15 +571,20 @@ class Parser:
         # '<' expr [':' expr] '>' where exprs are simple (num/name/arith of them)
         j = self.i + 1
         depth = 0
+        angle = 0
         while j < len(self.t):
             tk = self.t[j]
             if tk.kind == 'op' and tk.val == '(':
                 depth += 1
             elif tk.kind == 'op' and tk.val == ')':
                 depth -= 1
+            elif depth == 0 and tk.kind == 'op' and tk.val == '<':
+                angle += 1
             elif depth == 0 and tk.kind == 'op' and tk.val == '>':
-                return True
-            elif tk.kind == 'op' and tk.val in (';', '{', '}', '<', '=', ':=', '==') and depth == 0:
+                if angle == 0:
+                    return True
+                angle -= 1
+            elif tk.kind == 'op' and tk.val in (';', '{', '}', '=', ':=', '==') and depth == 0:
                 return False
             elif tk.kind == 'eof':
                 return False
@@ -654,6 +661,10 @@ class Parser:
         if tok.kind in ('num', 'const'):
             self.eat()
             return (tok.kind, tok.val)
+        if tok.kind == 'str':
+            self.eat()
+            STATS['string constant'] += 1
+            return ('str', tok.val)
         if self.at('('):
             self.eat()
             e = self.expr()

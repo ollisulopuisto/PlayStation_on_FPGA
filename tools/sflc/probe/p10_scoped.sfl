@@ -13,6 +13,7 @@ circuit p10 {
 	instruct go generate st.do();
 	stage st {
 		reg_wr cnt<2>;
+		state_name s0, s1;
 		first_state s0;
 		state s0 par{ cnt++; goto s1; }
 		state s1 if(cnt==0b11) finish;
