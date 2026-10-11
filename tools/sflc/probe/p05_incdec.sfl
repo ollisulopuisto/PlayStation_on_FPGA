@@ -1,0 +1,10 @@
+circuit p05 {
+	input a<8>;
+	instrin up, dn, add;
+	output y<8>;
+	reg_wr r<8>;
+	instruct up r++;
+	instruct dn r--;
+	instruct add r += a;
+	y = r;
+}

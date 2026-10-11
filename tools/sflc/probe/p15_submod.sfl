@@ -1,0 +1,13 @@
+declare leaf interface {
+	input x<8>;
+	output q<8>;
+	instrin con;
+	instr_arg con(x);
+}
+circuit p15 {
+	input a<8>;
+	output y<8>, z<8>;
+	leaf l0, l1;
+	y = l0.con(a).q;
+	z = l1.con(a + 0x01).q;
+}

@@ -1,0 +1,9 @@
+circuit p09 {
+	input a<4>, b<4>, c<8>, d<8>, e<8>;
+	output y1<8>, y2<8>, y3<8>, y4, y5<8>;
+	y1 = a || b + c;
+	y2 = c + d - e;
+	y3 = c - d + e;
+	y4 = c == d & e<0>;
+	y5 = c & d | e;
+}

@@ -1,0 +1,7 @@
+circuit p03 {
+	input a<8>, b<8>;
+	output y<8>;
+	sel t<8>;
+	t = a & b;
+	y = t;
+}

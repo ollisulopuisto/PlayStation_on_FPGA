@@ -1,0 +1,18 @@
+circuit p13 {
+	input din<8>;
+	instrin start;
+	instr_arg start(din);
+	output busy, dout<8>;
+	reg_wr acc<8>;
+	stage_name work { task do(dreg); }
+	reg_wr dreg<8>;
+	instruct start generate work.do(din);
+	busy = work.do;
+	dout = acc;
+	stage work {
+		state_name s0, s1;
+		first_state s0;
+		state s0 par { acc := dreg; goto s1; }
+		state s1 par { acc := acc + 0x01; goto s0; finish; }
+	}
+}

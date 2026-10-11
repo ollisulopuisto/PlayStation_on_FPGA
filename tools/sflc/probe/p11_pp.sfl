@@ -1,0 +1,10 @@
+%d WIDTHVAL 0x55
+#define FEAT
+circuit p11 {
+	output y<8>;
+#ifdef FEAT
+	y = WIDTHVAL;
+#else
+	y = 0x00;
+#endif
+}

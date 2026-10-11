@@ -1,0 +1,7 @@
+circuit p04 {
+	input a<8>, b<8>;
+	output y<8>, ne, eq;
+	y = a - b;
+	ne = a != b;
+	eq = a == b;
+}

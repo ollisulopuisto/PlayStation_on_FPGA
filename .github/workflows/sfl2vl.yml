@@ -1,0 +1,34 @@
+name: sfl2vl probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [pocket-work]
+    paths: ['tools/sflc/**', '.github/workflows/sfl2vl.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install i386 libc
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libc6:i386
+      - name: Fetch archived sfl2vl (2010 Linux i386, evaluation mode)
+        run: |
+          curl -sSL --retry 5 -o sfl2vl.tgz \
+            "https://web.archive.org/web/2id_/http://www.overtone.co.jp/binaries/sfl2vlbin-i386-linux-20100412.tar.gz"
+          echo "b67fd7216f5f5ca4222ef77a7d68c1c1e19dd45ebf6f5ad5e0522668f57724c1  sfl2vl.tgz" | sha256sum -c
+          mkdir -p "$RUNNER_TEMP/sfl2vl" && tar -xzf sfl2vl.tgz -C "$RUNNER_TEMP/sfl2vl"
+          echo "$RUNNER_TEMP/sfl2vl/usr/local/bin" >> "$GITHUB_PATH"
+          rm sfl2vl.tgz
+      - name: Run probes
+        run: mkdir -p out && (tools/sflc/ci_sfl2vl.sh out | tee out/summary.txt) || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sfl2vl-probe-out
+          path: out/
+          retention-days: 14

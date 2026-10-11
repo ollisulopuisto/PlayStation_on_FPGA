@@ -1,0 +1,5 @@
+module p16 {
+	input a<8>;
+	output y<8>;
+	y = a;
+}

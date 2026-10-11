@@ -1,0 +1,6 @@
+circuit p14 {
+	input a, b;
+	output y<2>, z<2>;
+	any { a : y = 0b01; b : y = 0b10; else : y = 0b00; }
+	alt { a : z = 0b01; b : z = 0b10; else : z = 0b00; }
+}

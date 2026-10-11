@@ -1,0 +1,10 @@
+circuit p02 {
+	input s<2>, a<8>, b<8>;
+	output y<8>;
+	switch(s){
+		case 0: y = a;
+		case 1: y = b;
+		case 0b10: par{ y = a; }
+		default: y = 0x00;
+	}
+}

@@ -1,0 +1,7 @@
+circuit p07 {
+	output y<8>, z<4>;
+	reg r<8> = 1;
+	mem m[4]<4> = {0};
+	y = r;
+	z = m[0b00];
+}

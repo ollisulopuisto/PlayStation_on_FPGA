@@ -1,0 +1,16 @@
+circuit p08 {
+	input a<4>;
+	output y<4>, z<3>, w<8>;
+	reg_wr acc<8>;
+	instrin go;
+	par(i=0;i<4;i++){
+		y<i> = a<3-i>;
+	}
+	alt(i=0;i<4;i++){
+		a<i> : z = i;
+	}
+	instruct go join(i=0;i<4;i++){
+		acc := acc + (0b0000000 || a<i>);
+	}
+	w = acc;
+}

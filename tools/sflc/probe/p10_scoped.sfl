@@ -1,0 +1,20 @@
+circuit p10 {
+	input a<8>, en;
+	output y<8>;
+	instrin go;
+	instrself sub;
+	stage_name st { task do(); }
+	if(en){
+		instruct sub y = a;
+	}
+	else{
+		y = 0x00;
+	}
+	instruct go generate st.do();
+	stage st {
+		reg_wr cnt<2>;
+		first_state s0;
+		state s0 par{ cnt++; goto s1; }
+		state s1 if(cnt==0b11) finish;
+	}
+}

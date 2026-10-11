@@ -1,0 +1,8 @@
+circuit p12 {
+	input a<8>, b<8>;
+	output y<16>, o, x<8>, n<8>;
+	y = 16#a;
+	o = /|a;
+	x = a @ b;
+	n = ^a;
+}

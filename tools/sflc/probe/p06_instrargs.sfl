@@ -1,0 +1,10 @@
+circuit p06 {
+	input a<8>;
+	instrin go(a);
+	instrout req(o);
+	output o<8>;
+	instrself inner(t);
+	sel t<8>;
+	instruct go inner(a);
+	instruct inner req(t);
+}

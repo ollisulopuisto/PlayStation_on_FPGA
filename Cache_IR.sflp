@@ -100,7 +100,7 @@ circuit Cache_IR
 		}
 		ram0_write(index, (offset==0) || din_line<31:0>);
 		ram1_write(index, ((offset==0)|(offset==1)) || din_line<63:32>);
-		ram2_write(index, ((offset==0)|(offset==0)|(offset==2)) || din_line<95:64>);
+		ram2_write(index, ((offset==0)|(offset==1)|(offset==2)) || din_line<95:64>);
 		ram3_write(index, 0b1 || din_line<127:96>);
 	}
 
