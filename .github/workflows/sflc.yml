@@ -28,3 +28,7 @@ jobs:
       - name: Diagnose bank initialization
         if: always()
         run: PYTHONDONTWRITEBYTECODE=1 python3 tools/sflc/tests/debug_bank_init.py
+      - name: Validate pixel-domain diagnostic
+        run: |
+          iverilog -g2012 -Wall -s tb_diagnostic_core -o /tmp/diagnostic.vvp Pocket/diagnostic/diagnostic_core.sv Pocket/diagnostic/tb_diagnostic_core.sv
+          vvp /tmp/diagnostic.vvp
