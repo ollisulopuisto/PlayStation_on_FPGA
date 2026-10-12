@@ -10,6 +10,7 @@ Unsupported constructs fail rather than silently disappear.
 Usage: sflc.py [-D NAME]... [--assertions] file.sflp > out.sv
 """
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -194,7 +195,6 @@ class Gen:
         self.instances = {}   # instance name -> (Interface, port alias mapping)
         self.observed_controls = set()
         self.expression_guards = []
-        self.call_arguments = {}  # formal -> guarded invocation values
 
     def port_ref(self, instance, member):
         if instance not in self.instances: raise NameError('unknown instance ' + instance)
@@ -414,8 +414,7 @@ class Gen:
         if len(args) != len(actuals): raise ValueError('argument count for ' + name)
         self.drive(name, guards, "1'b1")
         for formal, actual in zip(args, actuals):
-            self.call_arguments.setdefault(formal, []).append(
-                (list(guards), self.expr(actual, self.decls[formal])))
+            self.drive(formal, guards, self.expr(actual, self.decls[formal]))
 
     def action(self, a, guards, stage=None):
         previous = self.expression_guards
@@ -555,14 +554,6 @@ class Gen:
         for st in self.stages.values():
             if not st['body']: raise ValueError('stage declaration without body')
         for item in body: self.action(item, [])
-        # Native SFL instruction arguments are data connections. A sole call
-        # site wires its value continuously; multiple sites select by guards.
-        # Direct assignments remain separate writers (p18/p23 oracle evidence).
-        for formal, terms in self.call_arguments.items():
-            if len(terms) == 1:
-                self.drive(formal, [], terms[0][1])
-            else:
-                for guards, value in terms: self.drive(formal, guards, value)
         return self.emit()
 
     @staticmethod
@@ -572,6 +563,20 @@ class Gen:
     def mux(self, terms):
         return ' | '.join('((%s) ? (%s) : \'0)' % (self.guard(gs), val)
                           for gs, val in terms) or "'0"
+
+    def data_mux(self, terms, width):
+        # Native -O2 data selectors omit selection for a single distinct value
+        # or an unconditional writer. This applies to ordinary data as well as
+        # instruction arguments; control terminals retain activation guards.
+        values = list(dict.fromkeys(value for _, value in terms))
+        # A one-bit literal assignment is a Boolean control equation in the
+        # native compiler (p26), unlike a one-bit data signal connection.
+        if width == 1 and all(re.fullmatch(r"\d+'[bdho][0-9a-fA-F]+", value.strip('()'))
+                              for value in values):
+            return self.mux(terms)
+        if len(values) == 1 or any(not guards for guards, _ in terms):
+            return ' | '.join('(%s)' % value for value in values)
+        return self.mux(terms)
 
     def conflict_checks(self, terms, label):
         if not self.assertions: return []
@@ -602,7 +607,9 @@ class Gen:
             L.append('  %s %s (%s);' % (interface.name, instance, ', '.join(connections)))
         for n, kind in self.kinds.items():
             if kind in ('sel', 'output', 'instrself', 'instrout'):
-                L.append('  assign %s = %s;' % (n, self.mux(self.drivers.get(n, []))))
+                terms = self.drivers.get(n, [])
+                value = self.data_mux(terms, self.decls[n]) if kind in ('sel', 'output') else self.mux(terms)
+                L.append('  assign %s = %s;' % (n, value))
         stage_registers = {st['active'] for st in self.stages.values()}
         stage_registers.update(task['active'] for st in self.stages.values()
                                for task in st['tasks'].values())
