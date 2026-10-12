@@ -34,3 +34,14 @@ with tempfile.TemporaryDirectory() as tmp:
   subprocess.run(['iverilog','-g2012','-s','tb','-o',str(p/'out'),str(p/'dut.sv'),str(p/'tb.sv')],check=True)
   print('VARIANT '+label,flush=True)
   subprocess.run(['vvp',str(p/'out')],check=True)
+
+fullbench=(root/'tools/sflc/tests/tb_generators.sv').read_text()
+fullbench=fullbench.replace('check_outputs("initial asynchronous reset");', '$display("INITIAL clk=%b rst=%b load=%b wr=%b cells=%h %h %h %h q=%h %h %h %h",clk,reset,load,wr,dut.cells[0],dut.cells[1],dut.cells[2],dut.cells[3],q0,q1,q2,q3); check_outputs("initial asynchronous reset");')
+with tempfile.TemporaryDirectory() as tmp:
+ p=Path(tmp)
+ for label,tb in [('full',fullbench),('static_tasks',fullbench.replace('task automatic','task'))]:
+  (p/'dut.sv').write_text(source); (p/'tb.sv').write_text(tb)
+  subprocess.run(['iverilog','-g2012','-s','tb_generators','-o',str(p/'out'),str(p/'dut.sv'),str(p/'tb.sv')],check=True)
+  print('FULL VARIANT '+label,flush=True)
+  result=subprocess.run(['vvp',str(p/'out')])
+  print('FULL EXIT '+str(result.returncode),flush=True)
