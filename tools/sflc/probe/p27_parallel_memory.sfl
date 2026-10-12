@@ -6,8 +6,8 @@ circuit p27 {
     mem cells[4]<8> = {0};
     reg_wr count0<8>, count1<8>, count2<8>, count3<8>;
     if(load) par {
-        cells[0] := a+0; cells[1] := a+1;
-        cells[2] := a+2; cells[3] := a+3;
+        cells[0b00] := a+0; cells[0b01] := a+1;
+        cells[0b10] := a+2; cells[0b11] := a+3;
     }
     if(wr) cells[addr] := a;
     if(bits<0>) count0++;
@@ -22,5 +22,5 @@ circuit p27 {
           bits<2> : first=2; bits<3> : first=3; else : first=7; }
     any { bits<0> : mask=0b0001<<0; bits<1> : mask=0b0001<<1;
           bits<2> : mask=0b0001<<2; bits<3> : mask=0b0001<<3; else : mask=0; }
-    q0=cells[0]; q1=cells[1]; q2=cells[2]; q3=cells[3];
+    q0=cells[0b00]; q1=cells[0b01]; q2=cells[0b10]; q3=cells[0b11];
 }
