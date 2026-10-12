@@ -680,9 +680,16 @@ class Gen:
         for name, (depth, vals) in self.memories.items():
             if vals is not None:
                 L.append('  initial begin')
-                L.append("    for (integer i = 0; i < %d; i = i + 1) %s[i] = '0;" % (depth, name))
-                for i, val in enumerate(vals):
-                    L.append("    %s[%d] = %d'd%d;" % (name, i, self.decls[name], val))
+                if name in banks:
+                    # Keep initialization static like the per-word writers.
+                    # Older Icarus loses mixed dynamic/static array initialization.
+                    for i in range(depth):
+                        val = vals[i] if i < len(vals) else 0
+                        L.append("    %s[%d] = %d'd%d;" % (name, i, self.decls[name], val))
+                else:
+                    L.append("    for (integer i = 0; i < %d; i = i + 1) %s[i] = '0;" % (depth, name))
+                    for i, val in enumerate(vals):
+                        L.append("    %s[%d] = %d'd%d;" % (name, i, self.decls[name], val))
                 L.append('  end')
             writes = self.writes.get(name, [])
             if name in banks:
