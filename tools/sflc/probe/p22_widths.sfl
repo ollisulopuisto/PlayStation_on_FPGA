@@ -5,5 +5,5 @@ circuit p22 {
     low = (a+b)<7:0>;
     wide = a+b;
     signed_part = 16#a<6:2>;
-    neg = -a;
+    neg = 0x00-a;
 }
