@@ -4,10 +4,10 @@ circuit p23 {
     input a<8>, b<8>, c<8>;
     instrin start_one, start_left, start_right, start_direct;
     instrself one, many, direct;
+    sel one_arg<8>, many_arg<8>, direct_arg<8>;
     instr_arg one(one_arg);
     instr_arg many(many_arg);
     instr_arg direct(direct_arg);
-    sel one_arg<8>, many_arg<8>, direct_arg<8>;
     output one_value<8>, many_value<8>, direct_value<8>;
 
     instruct start_one one(a);
