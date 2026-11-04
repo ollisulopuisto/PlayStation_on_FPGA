@@ -14,60 +14,74 @@ from collections import Counter
 
 # --------------------------------------------------------------------------- preprocess
 
+# Precompiled regular expressions for preprocessing directives and comments.
+RE_IF = re.compile(r'#(ifdef|ifndef)\s+(\w+)')
+RE_DEFINE = re.compile(r'#define\s+(\w+)(?:\s+(.*))?$')
+RE_MACRO = re.compile(r'%d\s+(\w+)\s+(.*)$')
+RE_INCLUDE = re.compile(r'%i\s+"([^"]+)"')
+RE_WORD = re.compile(r'\b\w+\b')
+RE_COMMENT = re.compile(r'/\*.*?\*/|//[^\n]*', flags=re.S)
+
+
 def preprocess(text, defines):
     """Strip comments, apply #ifdef/#ifndef/#else/#endif/#define and %d macros.
     Returns (lines, includes). Line structure is preserved for error messages."""
     text = text.replace('\r\n', '\n').replace('\r', '\n')
-    # comments -> spaces, preserving newlines
-    def blank(m):
-        return re.sub(r'[^\n]', ' ', m.group())
-    text = re.sub(r'/\*.*?\*/|//[^\n]*', blank, text, flags=re.S)
+    # comments -> spaces, preserving newlines. Replacing non-newlines directly
+    # avoids compiling and executing nested regex per comment span.
+    text = RE_COMMENT.sub(lambda m: ''.join('\n' if c == '\n' else ' ' for c in m.group()), text)
     out, includes, macros = [], [], {}
     stack = []  # (active_parent, this_branch_active)
     active = True
     for line in text.split('\n'):
         s = line.strip()
-        m = re.match(r'#(ifdef|ifndef)\s+(\w+)', s)
-        if m:
-            cond = (m.group(2) in defines) == (m.group(1) == 'ifdef')
-            stack.append((active, cond))
-            active = active and cond
-            out.append('')
-            continue
-        if s.startswith('#else'):
-            parent, cond = stack[-1]
-            stack[-1] = (parent, not cond)
-            active = parent and not cond
-            out.append('')
-            continue
-        if s.startswith('#endif'):
-            active = stack.pop()[0]
-            out.append('')
-            continue
+        # Fast path: the vast majority (>99%) of lines are normal code statements,
+        # not preprocessor directives. Checking for '#' or '%' before attempting
+        # multiple regex match calls skips unnecessary pattern matching on non-directives.
+        if s and (s[0] == '#' or s[0] == '%'):
+            m = RE_IF.match(s)
+            if m:
+                cond = (m.group(2) in defines) == (m.group(1) == 'ifdef')
+                stack.append((active, cond))
+                active = active and cond
+                out.append('')
+                continue
+            if s.startswith('#else'):
+                parent, cond = stack[-1]
+                stack[-1] = (parent, not cond)
+                active = parent and not cond
+                out.append('')
+                continue
+            if s.startswith('#endif'):
+                active = stack.pop()[0]
+                out.append('')
+                continue
+            if not active:
+                out.append('')
+                continue
+            m = RE_DEFINE.match(s)
+            if m:
+                defines.add(m.group(1))
+                if m.group(2):
+                    macros[m.group(1)] = m.group(2)
+                out.append('')
+                continue
+            m = RE_MACRO.match(s)
+            if m:
+                macros[m.group(1)] = m.group(2).strip()
+                out.append('')
+                continue
+            m = RE_INCLUDE.match(s)
+            if m:
+                includes.append(m.group(1))
+                out.append('')
+                continue
+            raise SyntaxError('unknown directive: ' + s)
         if not active:
             out.append('')
             continue
-        m = re.match(r'#define\s+(\w+)(?:\s+(.*))?$', s)
-        if m:
-            defines.add(m.group(1))
-            if m.group(2):
-                macros[m.group(1)] = m.group(2)
-            out.append('')
-            continue
-        m = re.match(r'%d\s+(\w+)\s+(.*)$', s)
-        if m:
-            macros[m.group(1)] = m.group(2).strip()
-            out.append('')
-            continue
-        m = re.match(r'%i\s+"([^"]+)"', s)
-        if m:
-            includes.append(m.group(1))
-            out.append('')
-            continue
-        if s.startswith('#') or s.startswith('%'):
-            raise SyntaxError('unknown directive: ' + s)
         if macros:
-            line = re.sub(r'\b\w+\b', lambda mm: macros.get(mm.group(), mm.group()), line)
+            line = RE_WORD.sub(lambda mm: macros.get(mm.group(), mm.group()), line)
         out.append(line)
     if stack:
         raise SyntaxError('unterminated #ifdef')
