@@ -67,6 +67,41 @@ class PreprocessTests(unittest.TestCase):
         with self.assertRaises(SyntaxError):
             sflp_parse.preprocess(src, set())
 
+    def test_lex_tokens_and_positions(self):
+        lines = [
+            "circuit test {",
+            "    input a<8>;",
+            "    a = 0x10;",
+            "}",
+        ]
+        toks = sflp_parse.lex(lines)
+        kinds = [(t.kind, t.val, t.line) for t in toks]
+        self.assertEqual(kinds[0], ("kw", "circuit", 1))
+        self.assertEqual(kinds[1], ("name", "test", 1))
+        self.assertEqual(kinds[2], ("op", "{", 1))
+        self.assertEqual(kinds[3], ("kw", "input", 2))
+        self.assertEqual(kinds[4], ("name", "a", 2))
+        self.assertEqual(kinds[5], ("op", "<", 2))
+        self.assertEqual(kinds[6], ("num", "8", 2))
+        self.assertEqual(kinds[7], ("op", ">", 2))
+        self.assertEqual(kinds[8], ("op", ";", 2))
+        self.assertEqual(kinds[-1], ("eof", None, 4))
+
+    def test_lex_bad_character_raises(self):
+        with self.assertRaisesRegex(SyntaxError, r"line 1: bad character '\$'"):
+            sflp_parse.lex(["a = $10;"])
+
+    def test_parser_helpers(self):
+        toks = sflp_parse.lex(["circuit test { input a; }"])
+        parser = sflp_parse.Parser(toks, "test.sflp")
+        self.assertTrue(parser.at("circuit"))
+        self.assertFalse(parser.at("module"))
+        self.assertEqual(parser.peek(1).val, "test")
+        self.assertEqual(parser.peek(100).kind, "eof")
+        self.assertTrue(parser.accept("circuit"))
+        self.assertEqual(parser.cur.val, "test")
+        self.assertEqual(parser.name(), "test")
+
 
 if __name__ == '__main__':
     unittest.main()
