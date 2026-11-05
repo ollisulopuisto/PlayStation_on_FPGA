@@ -122,19 +122,24 @@ def lex(lines):
     toks = []
     text = '\n'.join(lines)
     pos, line = 0, 1
-    while pos < len(text):
-        m = TOKEN_RE.match(text, pos)
-        if not m:
+    # Optimization: using finditer avoids repeatedly calling match() at advancing offsets,
+    # and skipping group() creation for whitespace tokens reduces string allocations.
+    for m in TOKEN_RE.finditer(text):
+        if m.start() != pos:
             raise SyntaxError('line %d: bad character %r' % (line, text[pos]))
         kind = m.lastgroup
-        val = m.group()
-        if kind == 'nl':
+        if kind == 'ws':
+            pass
+        elif kind == 'nl':
             line += 1
-        elif kind != 'ws':
+        else:
+            val = m.group()
             if kind == 'name' and val in KEYWORDS:
                 kind = 'kw'
             toks.append(Tok(kind, val, line))
         pos = m.end()
+    if pos < len(text):
+        raise SyntaxError('line %d: bad character %r' % (line, text[pos]))
     toks.append(Tok('eof', None, line))
     return toks
 
@@ -154,13 +159,19 @@ class Parser:
         return self.t[self.i]
 
     def peek(self, k=1):
-        return self.t[min(self.i + k, len(self.t) - 1)]
+        # Optimization: avoid min() overhead across thousands of peek calls.
+        idx = self.i + k
+        t = self.t
+        return t[idx] if idx < len(t) else t[-1]
 
     def at(self, *vals):
-        return self.cur.val in vals and self.cur.kind in ('op', 'kw')
+        # Optimization: avoid self.cur property call overhead on hot parsing path.
+        tok = self.t[self.i]
+        return tok.val in vals and tok.kind in ('op', 'kw')
 
     def eat(self, val=None, kind=None):
-        tok = self.cur
+        # Optimization: directly index self.t[self.i] instead of self.cur property.
+        tok = self.t[self.i]
         if val is not None and (tok.val != val or tok.kind not in ('op', 'kw')):
             self.err('expected %r' % val)
         if kind is not None and tok.kind != kind:
@@ -169,7 +180,9 @@ class Parser:
         return tok
 
     def accept(self, val):
-        if self.at(val):
+        # Optimization: direct token check avoiding self.at() / self.cur call overhead.
+        tok = self.t[self.i]
+        if tok.val == val and tok.kind in ('op', 'kw'):
             self.i += 1
             return True
         return False
