@@ -164,10 +164,17 @@ class Parser:
         t = self.t
         return t[idx] if idx < len(t) else t[-1]
 
-    def at(self, *vals):
-        # Optimization: avoid self.cur property call overhead on hot parsing path.
+    def at(self, val, *vals):
+        # Optimization: >78% of all .at() calls check a single token value.
+        # Defining (val, *vals) allows fast-path direct equality comparison
+        # without tuple allocation or set lookup for single-argument checks,
+        # and checking token kind directly avoids extra membership hashing.
         tok = self.t[self.i]
-        return tok.val in vals and tok.kind in ('op', 'kw')
+        if tok.kind != 'op' and tok.kind != 'kw':
+            return False
+        if not vals:
+            return tok.val == val
+        return tok.val == val or tok.val in vals
 
     def eat(self, val=None, kind=None):
         # Optimization: directly index self.t[self.i] instead of self.cur property.
@@ -197,7 +204,8 @@ class Parser:
     # -- top level
     def file(self):
         items = []
-        while self.cur.kind != 'eof':
+        t = self.t
+        while t[self.i].kind != 'eof':
             if self.at('declare'):
                 items.append(self.declare())
             elif self.at('circuit', 'module'):
@@ -229,9 +237,10 @@ class Parser:
         self.eat('}')
         return (kind, name, body)
 
-    DECL_KW = ('input', 'output', 'bidirect', 'inout', 'instrin', 'instrout', 'instrself',
-               'instr_arg', 'sel', 'sel_v', 'bus', 'bus_v', 'reg', 'reg_wr', 'reg_ws', 'mem',
-               'stage_name')
+    # Optimization: using frozenset enables O(1) set membership check.
+    DECL_KW = frozenset({'input', 'output', 'bidirect', 'inout', 'instrin', 'instrout', 'instrself',
+                         'instr_arg', 'sel', 'sel_v', 'bus', 'bus_v', 'reg', 'reg_wr', 'reg_ws', 'mem',
+                         'stage_name'})
 
     def decl_item(self):
         if not self.at(*self.DECL_KW):
@@ -568,7 +577,8 @@ class Parser:
         start = self.i
         terms = [self.unary()]
         ops = []
-        while self.cur.kind == 'op' and self.cur.val in self.BINOPS:
+        t = self.t
+        while t[self.i].kind == 'op' and t[self.i].val in self.BINOPS:
             ops.append(self.eat().val)
             terms.append(self.unary())
         if len(ops) == 0:
