@@ -13,3 +13,7 @@
 ## 2026-11-07 - Rejected: lex() whitespace m.group() caching in sflp_parse.py
 **Learning:** Skipping `m.group()` for whitespace tokens in `lex()` (using finditer + `continue` for 'ws' kind) is functionally equivalent but NOT measurable. `test_01_parse_original_sources` interleaved paired runs (10 pairs): baseline avg 9.471s vs optimized avg 9.423s, paired t-test t = -0.44 (p > 0.05) — within run-to-run noise. Whitespace tokens are a tiny fraction of total tokens and `m.group()` is cheap.
 **Action:** The lexer hot spot (12.3s cumulative) is dominated by per-token Python object construction (`Tok(...)`), not `m.group()`. Do not re-attempt micro-optimizations that don't address the dominant cost.
+
+## 2026-11-07 - Rejected: at() single-arg fast-path in sflp_parse.py Parser
+**Learning:** `at()` has 13M calls / 1.1s tottime but optimizing it to bypass tuple packing and `cur.val in vals` for single args yields NO measurable gain: `test_01_parse_original_sources` interleaved paired runs (12 pairs): baseline avg 9.600s vs optimized avg 9.610s, paired t-test t = +0.08 (p > 0.05) — within run-to-run noise. `at()` is not on the critical path; the dominant costs are `circuit`/`circuit_item`/`action` recursion and per-token object construction.
+**Action:** Do not re-attempt `at()` micro-optimization. The remaining parse cost is structural (recursive descent over 4599 files / 37MB), not fixable by a <50 line tweak.
