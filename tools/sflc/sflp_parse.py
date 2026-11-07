@@ -27,6 +27,16 @@ def preprocess(text, defines):
     active = True
     for line in text.split('\n'):
         s = line.strip()
+        # Most lines are plain code, not directives: skip all regex matches
+        # unless the stripped line starts with '#' or '%'.
+        if not s or s[0] not in '#%':
+            if active:
+                if macros:
+                    line = re.sub(r'\b\w+\b', lambda mm: macros.get(mm.group(), mm.group()), line)
+                out.append(line)
+            else:
+                out.append('')
+            continue
         m = re.match(r'#(ifdef|ifndef)\s+(\w+)', s)
         if m:
             cond = (m.group(2) in defines) == (m.group(1) == 'ifdef')
@@ -64,11 +74,7 @@ def preprocess(text, defines):
             includes.append(m.group(1))
             out.append('')
             continue
-        if s.startswith('#') or s.startswith('%'):
-            raise SyntaxError('unknown directive: ' + s)
-        if macros:
-            line = re.sub(r'\b\w+\b', lambda mm: macros.get(mm.group(), mm.group()), line)
-        out.append(line)
+        raise SyntaxError('unknown directive: ' + s)
     if stack:
         raise SyntaxError('unterminated #ifdef')
     return out, includes, macros
@@ -108,9 +114,10 @@ def lex(lines):
     toks = []
     text = '\n'.join(lines)
     pos, line = 0, 1
-    while pos < len(text):
-        m = TOKEN_RE.match(text, pos)
-        if not m:
+    # finditer scans the text once in C instead of re.match() per token,
+    # which avoids per-token Python-call and regex-engine setup overhead.
+    for m in TOKEN_RE.finditer(text):
+        if m.start() > pos:
             raise SyntaxError('line %d: bad character %r' % (line, text[pos]))
         kind = m.lastgroup
         val = m.group()
@@ -121,6 +128,8 @@ def lex(lines):
                 kind = 'kw'
             toks.append(Tok(kind, val, line))
         pos = m.end()
+    if pos < len(text):
+        raise SyntaxError('line %d: bad character %r' % (line, text[pos]))
     toks.append(Tok('eof', None, line))
     return toks
 
