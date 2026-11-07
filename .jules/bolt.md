@@ -17,3 +17,7 @@
 ## 2026-11-07 - Rejected: at() single-arg fast-path in sflp_parse.py Parser
 **Learning:** `at()` has 13M calls / 1.1s tottime but optimizing it to bypass tuple packing and `cur.val in vals` for single args yields NO measurable gain: `test_01_parse_original_sources` interleaved paired runs (12 pairs): baseline avg 9.600s vs optimized avg 9.610s, paired t-test t = +0.08 (p > 0.05) — within run-to-run noise. `at()` is not on the critical path; the dominant costs are `circuit`/`circuit_item`/`action` recursion and per-token object construction.
 **Action:** Do not re-attempt `at()` micro-optimization. The remaining parse cost is structural (recursive descent over 4599 files / 37MB), not fixable by a <50 line tweak.
+
+## 2026-11-07 - Re-sweep: still no measurable targets
+**Learning:** Full `run_tests.py` is ~1.9s, of which ~1.75s is iverilog/vvp subprocess wait; all sflc/sflp_parse Python together is ~0.2s, so there is nothing left to win there. Remaining RTL loops (fabric arbiter, sdram128 gather, spu_dsp_shared voice loop) are real logic, not avoidable work. `diagnostic_core.sv` and `ram_320x240x15_dp.sv` are trivial; their sim time is all testbench. On Ubuntu 22.04's Icarus 11, `tb_sdram128_*`, `tb_i2s_cdc` and the audio benches fail to parse because they need Icarus 13. `tb_spu_shared`/`tb_psx_boot` also need the generated `PlayStation_core.sv` from the proprietary SFL flow.
+**Action:** Report NO_TARGETS_LEFT unless new code lands. Re-checking the SPU/SDRAM RTL first needs Icarus 13 and the generated core sources.
