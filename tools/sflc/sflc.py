@@ -754,10 +754,16 @@ class Gen:
     def conflict_checks(self, terms, label):
         if not self.assertions: return []
         lines = []
-        for i, (ga, _) in enumerate(terms):
-            for gb, _ in terms[i+1:]:
-                lines.append('    if ((%s) && (%s)) $fatal(1, "conflicting drivers: %s");' %
-                             (self.guard(ga), self.guard(gb), label))
+        # Render each guard once: conflict_checks re-emits every guard once per
+        # writer pair (O(n^2)), so caching the rendered string leaves the inner
+        # loop as pure string assembly with no repeated dict lookups.
+        rendered = [self.guard(g) for g, _ in terms]
+        append = lines.append
+        fmt = '    if ((%s) && (%s)) $fatal(1, "conflicting drivers: %s");'
+        for i in range(len(terms)):
+            gi = rendered[i]
+            for j in range(i + 1, len(terms)):
+                append(fmt % (gi, rendered[j], label))
         return lines
 
     def banked_memories(self):
