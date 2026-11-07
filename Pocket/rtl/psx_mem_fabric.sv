@@ -85,10 +85,8 @@ module psx_mem_fabric #(
         end_address = {1'b0, p_req_addr[pick]} + 26'(p_req_len[pick]);
         bad_request = p_req_len[pick] == 0 || p_req_len[pick] > 8 ||
                       end_address > 26'h2000000;
-        bounded_mask = '0;
-        for (integer byte_lane = 0; byte_lane < 16; byte_lane = byte_lane + 1)
-            if (byte_lane < 2 * int'(p_req_len[pick]))
-                bounded_mask[byte_lane] = (p_req_mask[pick] >> byte_lane) & 1'b1;
+        // Replace the 16-lane loop with a single bitmask: lanes [0, 2*len) are valid.
+        bounded_mask = p_req_mask[pick] & ((16'h1 << (2 * int'(p_req_len[pick]))) - 16'h1);
     end
 
     assign b_req_valid = !rst && state == ISSUE;
