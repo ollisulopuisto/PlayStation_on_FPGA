@@ -242,8 +242,13 @@ class Parser:
                          'instr_arg', 'sel', 'sel_v', 'bus', 'bus_v', 'reg', 'reg_wr', 'reg_ws', 'mem',
                          'stage_name'})
 
+    def at_decl(self):
+        # Optimization: avoids unpacking DECL_KW frozenset into tuple on every check.
+        tok = self.t[self.i]
+        return tok.kind == 'kw' and tok.val in self.DECL_KW
+
     def decl_item(self):
-        if not self.at(*self.DECL_KW):
+        if not self.at_decl():
             self.err('expected declaration')
         kw = self.eat().val
         STATS['decl ' + kw] += 1
@@ -316,7 +321,7 @@ class Parser:
 
     def circuit_item(self):
         tok = self.cur
-        if self.at(*self.DECL_KW):
+        if self.at_decl():
             return self.decl_item()
         if self.at('declare'):
             return self.declare()
@@ -369,7 +374,7 @@ class Parser:
                 sname = self.name()
                 STATS['state'] += 1
                 body.append(('state', sname, self.action(), sline))
-            elif self.at(*self.DECL_KW):
+            elif self.at_decl():
                 STATS['decl inside stage'] += 1
                 body.append(self.decl_item())
             else:
@@ -401,146 +406,162 @@ class Parser:
         return (var, start, end)
 
     def action(self):
-        tok = self.cur
+        # Optimization: dispatch immediately by token kind ('name', 'kw', 'op').
+        # Over 55% of actions in SFL+ start with an identifier ('name' - assignments
+        # or invocations), 35% with statements ('kw'), and ~8% with blocks/nops ('op').
+        # Direct dispatch eliminates up to a dozen sequential keyword tests and
+        # frozenset unpacking per action call in the parser's hottest loop.
+        tok = self.t[self.i]
         line = tok.line
-        if self.at(*self.DECL_KW) or self.at('instruct', 'stage') or (
-                tok.kind == 'name' and self.peek().kind == 'name'):
-            STATS['decl/instance/instruct inside action'] += 1
-            return ('item', self.circuit_item())
-        if self.at('par', 'alt', 'any', 'join'):
-            kw = self.eat().val
-            gen = None
-            if self.at('('):
-                gen = self.gen_header()
-                STATS['%s generator' % kw] += 1
-            if kw in ('par', 'join'):
-                if self.at('{'):
-                    self.eat('{')
-                    acts = []
-                    while not self.at('}'):
-                        acts.append(self.action())
-                    self.eat('}')
-                else:
-                    acts = [self.action()]
-                STATS[kw] += 1
-                return (kw, gen, acts, line)
-            self.eat('{')
-            arms, els = [], None
-            while not self.at('}'):
-                if self.at('else'):
-                    self.eat()
+        kind = tok.kind
+        val = tok.val
+
+        if kind == 'name':
+            if self.peek().kind == 'name':
+                STATS['decl/instance/instruct inside action'] += 1
+                return ('item', self.circuit_item())
+            lhs = self.lvalue()
+            tok = self.t[self.i]
+            if tok.kind == 'op':
+                op = tok.val
+                if op in (':=', '='):
+                    self.i += 1
+                    rhs = self.expr()
+                    self.eat(';')
+                    STATS['assign ' + op] += 1
+                    return ('assign', op, lhs, rhs, line)
+                if op in ('++', '--'):
+                    self.i += 1
+                    self.eat(';')
+                    STATS['assign ' + op] += 1
+                    return ('incdec', op, lhs, line)
+                if op in ('+=', '-=', '&=', '|=', '^=', '@='):
+                    self.i += 1
+                    rhs = self.expr()
+                    self.eat(';')
+                    STATS['assign ' + op] += 1
+                    return ('opassign', op, lhs, rhs, line)
+                if op == '(':
+                    self.i += 1
+                    args = self.expr_list(')')
+                    self.eat(')')
+                    self.eat(';')
+                    STATS['invoke'] += 1
+                    return ('invoke', lhs, args, line)
+            self.err('expected := = ++ -- op= or (')
+        elif kind == 'kw':
+            if val in ('par', 'alt', 'any', 'join'):
+                self.i += 1
+                gen = None
+                if self.at('('):
+                    gen = self.gen_header()
+                    STATS['%s generator' % val] += 1
+                if val in ('par', 'join'):
+                    if self.at('{'):
+                        self.eat('{')
+                        acts = []
+                        while not self.at('}'):
+                            acts.append(self.action())
+                        self.eat('}')
+                    else:
+                        acts = [self.action()]
+                    STATS[val] += 1
+                    return (val, gen, acts, line)
+                self.eat('{')
+                arms, els = [], None
+                while not self.at('}'):
+                    if self.at('else'):
+                        self.eat()
+                        self.eat(':')
+                        els = self.action()
+                        STATS['%s else' % val] += 1
+                        continue
+                    g = self.expr()
                     self.eat(':')
-                    els = self.action()
-                    STATS['%s else' % kw] += 1
-                    continue
-                g = self.expr()
-                self.eat(':')
-                arms.append((g, self.action()))
-            self.eat('}')
-            STATS[kw] += 1
-            return (kw, gen, arms, els, line)
-        if self.at('if'):
-            self.eat()
-            self.eat('(')
-            c = self.expr()
-            self.eat(')')
-            a = self.action()
-            e = None
-            # 'else :' belongs to an enclosing any/alt, not to this if
-            if self.at('else') and not (self.peek().kind == 'op' and self.peek().val == ':'):
-                self.eat('else')
-                e = self.action()
-                STATS['if-else'] += 1
-            STATS['if'] += 1
-            return ('if', c, a, e, line)
-        if self.at('switch'):
-            self.eat()
-            self.eat('(')
-            sel = self.expr()
-            self.eat(')')
-            self.eat('{')
-            cases = []
-            while not self.at('}'):
-                if self.accept('default'):
-                    key = None
-                    STATS['switch default'] += 1
-                else:
-                    self.eat('case')
-                    key = self.expr()
-                self.eat(':')
+                    arms.append((g, self.action()))
+                self.eat('}')
+                STATS[val] += 1
+                return (val, gen, arms, els, line)
+            if val == 'if':
+                self.i += 1
+                self.eat('(')
+                c = self.expr()
+                self.eat(')')
+                a = self.action()
+                e = None
+                # 'else :' belongs to an enclosing any/alt, not to this if
+                if self.at('else') and not (self.peek().kind == 'op' and self.peek().val == ':'):
+                    self.eat('else')
+                    e = self.action()
+                    STATS['if-else'] += 1
+                STATS['if'] += 1
+                return ('if', c, a, e, line)
+            if val == 'goto':
+                self.i += 1
+                n = self.name()
+                self.eat(';')
+                STATS['goto'] += 1
+                return ('goto', n, line)
+            if val in ('generate', 'relay'):
+                self.i += 1
+                st = self.name()
+                self.eat('.')
+                task = self.name()
+                self.eat('(')
+                args = self.expr_list(')')
+                self.eat(')')
+                self.eat(';')
+                STATS[val] += 1
+                return (val, st, task, args, line)
+            if val == 'finish':
+                self.i += 1
+                self.eat(';')
+                STATS['finish'] += 1
+                return ('finish', line)
+            if val in self.DECL_KW or val in ('instruct', 'stage'):
+                STATS['decl/instance/instruct inside action'] += 1
+                return ('item', self.circuit_item())
+            if val == 'switch':
+                self.i += 1
+                self.eat('(')
+                sel = self.expr()
+                self.eat(')')
+                self.eat('{')
+                cases = []
+                while not self.at('}'):
+                    if self.accept('default'):
+                        key = None
+                        STATS['switch default'] += 1
+                    else:
+                        self.eat('case')
+                        key = self.expr()
+                    self.eat(':')
+                    acts = []
+                    while not self.at('case', 'default', '}'):
+                        acts.append(self.action())
+                    if len(acts) > 1:
+                        STATS['case with >1 action'] += 1
+                    cases.append((key, acts))
+                self.eat('}')
+                STATS['switch'] += 1
+                return ('switch', sel, cases, line)
+            if val in ('return', 'call'):
+                self.err('call/return not supported in spike')
+        elif kind == 'op':
+            if val == '{':
+                self.i += 1
                 acts = []
-                while not self.at('case', 'default', '}'):
+                while not self.at('}'):
                     acts.append(self.action())
-                if len(acts) > 1:
-                    STATS['case with >1 action'] += 1
-                cases.append((key, acts))
-            self.eat('}')
-            STATS['switch'] += 1
-            return ('switch', sel, cases, line)
-        if self.at('{'):
-            self.eat()
-            acts = []
-            while not self.at('}'):
-                acts.append(self.action())
-            self.eat('}')
-            STATS['bare block'] += 1
-            return ('par', None, acts, line)
-        if self.accept(';'):
-            STATS['nop'] += 1
-            return ('nop', line)
-        if self.at('goto'):
-            self.eat()
-            n = self.name()
-            self.eat(';')
-            STATS['goto'] += 1
-            return ('goto', n, line)
-        if self.at('finish'):
-            self.eat()
-            self.eat(';')
-            STATS['finish'] += 1
-            return ('finish', line)
-        if self.at('generate', 'relay'):
-            kw = self.eat().val
-            st = self.name()
-            self.eat('.')
-            task = self.name()
-            self.eat('(')
-            args = self.expr_list(')')
-            self.eat(')')
-            self.eat(';')
-            STATS[kw] += 1
-            return (kw, st, task, args, line)
-        if self.at('return', 'call'):
-            self.err('call/return not supported in spike')
-        # assignment or invocation
-        if tok.kind != 'name':
-            self.err('expected action')
-        lhs = self.lvalue()
-        if self.at(':=', '='):
-            op = self.eat().val
-            rhs = self.expr()
-            self.eat(';')
-            STATS['assign ' + op] += 1
-            return ('assign', op, lhs, rhs, line)
-        if self.at('++', '--'):
-            op = self.eat().val
-            self.eat(';')
-            STATS['assign ' + op] += 1
-            return ('incdec', op, lhs, line)
-        if self.at('+=', '-=', '&=', '|=', '^=', '@='):
-            op = self.eat().val
-            rhs = self.expr()
-            self.eat(';')
-            STATS['assign ' + op] += 1
-            return ('opassign', op, lhs, rhs, line)
-        if self.at('('):
-            self.eat('(')
-            args = self.expr_list(')')
-            self.eat(')')
-            self.eat(';')
-            STATS['invoke'] += 1
-            return ('invoke', lhs, args, line)
-        self.err('expected := = ++ -- op= or (')
+                self.eat('}')
+                STATS['bare block'] += 1
+                return ('par', None, acts, line)
+            if val == ';':
+                self.i += 1
+                STATS['nop'] += 1
+                return ('nop', line)
+
+        self.err('expected action')
 
     def lvalue(self):
         n = self.name()

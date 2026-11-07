@@ -1,0 +1,3 @@
+## 2026-11-06 - Dispatch Parser Statements by Token Kind Rather than Linear Keyword Matching
+**Learning:** In recursive descent AST parsers like `sflp_parse.py`, linear keyword checks (`if self.at('kw1'): ... elif self.at('kw2'): ...`) in hot methods like `action()` waste significant CPU cycles repeatedly checking keywords even though token kind (`name` for identifiers vs `kw` for statements vs `op` for blocks) already partitions the grammar. Unpacking sets into variadic helper arguments (`*self.DECL_KW`) also allocates tuples on every call.
+**Action:** Always dispatch statement parsers by token kind first, and use dedicated set membership helpers (`at_decl()`) instead of unpacking collections into `at(*set)`.
