@@ -81,21 +81,24 @@ class Scope:
     def expr(self, n, env):
         if not isinstance(n, tuple):
             return n
-        if n[0] == 'name':
-            if n[1] not in env:
+        # Optimization: cache node tag to avoid repeated tuple indexing and
+        # use dict.get() for single-lookup in the hot 'name' resolution path.
+        tag = n[0]
+        if tag == 'name':
+            value = env.get(n[1])
+            if value is None:
                 raise NameError('undeclared ' + n[1])
-            value = env[n[1]]
             return value if isinstance(value, tuple) else ('name', value)
-        if n[0] == 'str':
+        if tag == 'str':
             # "SCEI" is an 8-bit-per-character constant, first character in the
             # most significant byte (CDROM_controller slices str<31:24> first).
             text = n[1][1:-1] if n[1][:1] == '"' else n[1]
             if not text or not all(32 <= ord(c) < 127 and c != '\\' for c in text):
                 raise NotImplementedError('string constant ' + n[1])
             return ('const', '0x' + text.encode('ascii').hex().upper())
-        if n[0] == 'index' and n[1][0] == 'name' and n[1][1] not in env:
+        if tag == 'index' and n[1][0] == 'name' and n[1][1] not in env:
             return ('name', self.instance_element(n[1][1], constant(self.expr(n[2], env)), env))
-        if n[0] == 'dot':
+        if tag == 'dot':
             member = n[2]
             owner = n[1]
             # `ch[i].port` is unambiguous as a component reference even when
@@ -116,9 +119,11 @@ class Scope:
                 if member not in env: raise NameError('undeclared call result ' + member)
                 member = env[member]
             return ('dot', self.expr(owner, env), member)
-        return tuple(self.expr(x, env) if isinstance(x, tuple) else
-                     [self.expr(y, env) for y in x] if isinstance(x, list) else x
-                     for x in n)
+        # Optimization: use list comprehension instead of generator expression to avoid
+        # Python generator object allocation and iteration overhead on every AST node.
+        return tuple([self.expr(x, env) if isinstance(x, tuple) else
+                      [self.expr(y, env) for y in x] if isinstance(x, list) else x
+                      for x in n])
 
     @staticmethod
     def instance_element(base, value, env):
