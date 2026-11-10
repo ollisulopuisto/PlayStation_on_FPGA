@@ -125,15 +125,26 @@ class Scope:
                       [self.expr(y, env) for y in x] if isinstance(x, list) else x
                       for x in n])
 
-    @staticmethod
-    def instance_element(base, value, env):
+    HEX_DIGITS = frozenset('0123456789ABCDEF')
+
+    @classmethod
+    def instance_element(cls, base, value, env):
         """Map base[value] to the declared instance base_XX (uppercase hex).
 
         The digit count is taken from the declared names, never guessed, and
         the element must itself be declared: nothing is invented.
         """
-        found = {name[len(base) + 1:] for name in env
-                 if re.fullmatch(re.escape(base) + '_[0-9A-F]+', name)}
+        prefix = base + '_'
+        prefix_len = len(prefix)
+        hex_digits = cls.HEX_DIGITS
+        # Optimization: string prefix + set test avoids dynamic re.compile / re.escape
+        # on every instance array access in the environment.
+        found = {
+            suffix for name in env
+            if name.startswith(prefix) and (
+                suffix := name[prefix_len:]
+            ) and all(c in hex_digits for c in suffix)
+        }
         if not found: raise NameError('undeclared ' + base)
         widths = {len(digits) for digits in found}
         if len(widths) != 1: raise ValueError('ambiguous instance array ' + base)
