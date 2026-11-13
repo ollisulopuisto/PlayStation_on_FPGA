@@ -62,6 +62,23 @@ class PreprocessTests(unittest.TestCase):
         self.assertEqual(macros.get("WIDTH"), "16")
         self.assertEqual(lines[2], "input data<16>;")
 
+    def test_macro_word_boundary_and_multiple_replacements(self):
+        src = (
+            "#define FOO 42\n"
+            "%d BAR 99\n"
+            "reg FOO_REG, REG_FOO, FOO;\n"
+            "reg a = FOO + BAR;\n"
+            "reg untouched_line;\n"
+        )
+        lines, _, macros = sflp_parse.preprocess(src, set())
+        self.assertEqual(macros, {"FOO": "42", "BAR": "99"})
+        # FOO_REG and REG_FOO should NOT be replaced because FOO is only a substring, not a distinct word
+        self.assertEqual(lines[2], "reg FOO_REG, REG_FOO, 42;")
+        # Both FOO and BAR on the same line should be replaced
+        self.assertEqual(lines[3], "reg a = 42 + 99;")
+        # Non-matching line remains intact
+        self.assertEqual(lines[4], "reg untouched_line;")
+
     def test_unknown_directive_raises(self):
         src = "#invalid_directive"
         with self.assertRaises(SyntaxError):
