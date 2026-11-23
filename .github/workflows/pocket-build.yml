@@ -4,7 +4,7 @@ name: Pocket PS1 core build
 # compiles it with Quartus Prime Lite 25.1std (same installer route as
 # ollisulopuisto/MIRLO64). Produces a Pocket package (bitstream.rbf_r) from
 # the best closing fitter seed. Manual runs only until the route proves
-# itself; the seeds input keeps first runs small (default 2 seeds).
+# itself; the seeds input keeps first runs small (default 1 seed).
 #
 # Requires repo secret ASSETS_TOKEN (release-download token for
 # ollisulopuisto/mirlo64-quartus-assets, same value MIRLO64 uses).
