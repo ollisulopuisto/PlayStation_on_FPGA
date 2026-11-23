@@ -50,7 +50,8 @@ import fetch_diagnostic_reference as reference  # noqa: E402
 FIXES = ROOT / 'Pocket/source_fixes/pocket_top_fixes.json'
 SFLC = ROOT / 'tools/sflc/sflc.py'
 OWNED_RTL = ['Pocket/rtl/sdram128_burstn_adapter.sv', 'Pocket/audio/pocket_audio_out.sv',
-             'Pocket/rtl/ram_320x240x15_dp_2k5.sv', 'Pocket/rtl/ram_320x240x15_dp_banked.sv']
+             'Pocket/rtl/ram_320x240x15_dp_2k5.sv', 'Pocket/rtl/ram_320x240x15_dp_banked.sv',
+             'Pocket/rtl/pocket_gamepad_ctrl.sv']
 SPU_SV = ['spu_dsp_shared.sv', 'DigitalSignalProcessor_shared.sv']
 # PLL outputs as core_top.v uses them: clk_50, dram_ctrl_clk, dram_clk source
 # (sdr_phy clk2x_90), clk_25 (video), clk_25_90deg (video DDR clock).

@@ -182,6 +182,54 @@ module tb_pocket_gamepad_ctrl;
         key_in[10] = 0; key_in[11] = 0;
         cycle(2);
 
+        // 11. Regression: tap pulse residue must not leak into a following chord.
+        // Tap Select, then immediately chord Select+R inside the pulse window.
+        key_in[14] = 1;
+        cycle(3);
+        key_in[14] = 0;
+        cycle(1);
+        check("Tap starts a select pulse", key_out[14] == 1);
+        key_in[14] = 1; // re-press within the pulse window
+        cycle(1);
+        key_in[9] = 1;  // chord begins
+        cycle(1);
+        check("Chord after tap still toggles mode_r", mode_r == 2'b01);
+        check("Residue pulse is cleared during the chord", key_out[14] == 0);
+        key_in[14] = 0;
+        key_in[9] = 0;
+        cycle(PULSE_CYCLES + 2);
+        check("No select pulse after the chord", key_out[14] == 0);
+        // restore Tier 1 for R
+        key_in[14] = 1; key_in[9] = 1; cycle(2); key_in[14] = 0; key_in[9] = 0; cycle(10);
+        key_in[14] = 1; key_in[9] = 1; cycle(2); key_in[14] = 0; key_in[9] = 0; cycle(10);
+        check("R restored to Tier 1", mode_r == 2'b00);
+
+        // 12. L held before Select is pressed: chord still toggles, Select consumed
+        key_in[8] = 1; // L first
+        cycle(3);
+        key_in[14] = 1; // then Select
+        cycle(2);
+        check("L-first chord toggles mode_l", mode_l == 2'b01);
+        key_in[14] = 0;
+        key_in[8] = 0;
+        cycle(PULSE_CYCLES + 2);
+        check("L-first chord emits no select pulse", key_out[14] == 0);
+        // restore Tier 1 for L
+        key_in[14] = 1; key_in[8] = 1; cycle(2); key_in[14] = 0; key_in[8] = 0; cycle(10);
+        key_in[14] = 1; key_in[8] = 1; cycle(2); key_in[14] = 0; key_in[8] = 0; cycle(10);
+        check("L restored to Tier 1", mode_l == 2'b00);
+
+        // 13. Simultaneous Select+L+R toggles both sides in one chord
+        key_in[14] = 1; key_in[8] = 1; key_in[9] = 1;
+        cycle(2);
+        check("Double chord toggles both modes", mode_l == 2'b01 && mode_r == 2'b01);
+        key_in[14] = 0; key_in[8] = 0; key_in[9] = 0;
+        cycle(PULSE_CYCLES + 2);
+        check("Double chord emits no select pulse", key_out[14] == 0);
+        key_in[14] = 1; key_in[8] = 1; key_in[9] = 1; cycle(2); key_in[14] = 0; key_in[8] = 0; key_in[9] = 0; cycle(10);
+        key_in[14] = 1; key_in[8] = 1; key_in[9] = 1; cycle(2); key_in[14] = 0; key_in[8] = 0; key_in[9] = 0; cycle(10);
+        check("Both restored to Tier 1", mode_l == 2'b00 && mode_r == 2'b00);
+
         if (errors == 0) begin
             $display("PASS tb_pocket_gamepad_ctrl: all tests passed!");
             $finish(0);

@@ -72,6 +72,7 @@ module pocket_gamepad_ctrl #(
             // Mode R toggle: rising edge of chord_r (Select + R)
             if (chord_r && !chord_r_d) begin
                 select_consumed <= 1'b1;
+                pulse_cnt       <= 32'd0;
                 if (mode_r == 2'b10)
                     mode_r <= 2'b00;
                 else
@@ -81,6 +82,7 @@ module pocket_gamepad_ctrl #(
             // Mode L toggle: rising edge of chord_l (Select + L)
             if (chord_l && !chord_l_d) begin
                 select_consumed <= 1'b1;
+                pulse_cnt       <= 32'd0;
                 if (mode_l == 2'b10)
                     mode_l <= 2'b00;
                 else
@@ -90,8 +92,10 @@ module pocket_gamepad_ctrl #(
             // Select button state machine
             if (raw_select) begin
                 if (!raw_select_d) begin
-                    // Fresh press of select
+                    // Fresh press of select; drop any residue tap pulse so it
+                    // cannot leak into a chord that follows a tap
                     hold_cnt           <= 32'd0;
+                    pulse_cnt          <= 32'd0;
                     select_held_active <= 1'b0;
                     // If L or R was already held down, mark consumed immediately
                     select_consumed    <= raw_l | raw_r;
