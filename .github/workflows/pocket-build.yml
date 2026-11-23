@@ -1,0 +1,153 @@
+name: Pocket PS1 core build
+
+# Stages the Quartus project with tools/pocket/prepare_ps1_project.py and
+# compiles it with Quartus Prime Lite 25.1std (same installer route as
+# ollisulopuisto/MIRLO64). Produces a Pocket package (bitstream.rbf_r) per
+# closing fitter seed. Manual runs only until the route proves itself.
+#
+# Requires repo secret ASSETS_TOKEN (release-download token for
+# ollisulopuisto/mirlo64-quartus-assets, same value MIRLO64 uses).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  QUARTUS_CACHE_KEY: quartus-lite-25.1std.0.1129-cyclonev-v1
+
+jobs:
+  regressions:
+    name: HDL regressions (Icarus)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Run regressions
+        run: bash tools/pocket/run_regressions.sh
+
+  quartus-cache:
+    name: Download and cache Quartus installers
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - id: c
+        uses: actions/cache@v4
+        with:
+          path: ~/quartus-dl
+          key: ${{ env.QUARTUS_CACHE_KEY }}
+      - name: Download installers on cache miss
+        if: steps.c.outputs.cache-hit != 'true'
+        env:
+          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+          GH_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+        run: DOWNLOAD_ONLY=1 .github/scripts/install_quartus.sh  # gh CLI is preinstalled on hosted runners
+
+  fit:
+    name: Stage and compile, seed ${{ matrix.seed }}
+    needs: [regressions, quartus-cache]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libtinfo5 libncurses5 libpng16-16 libfreetype6 libsm6 libxrender1 libxext6 libxtst6 libxi6 libxft2 locales
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/quartus-dl
+          key: ${{ env.QUARTUS_CACHE_KEY }}
+      - name: Install Quartus Lite 25.1std
+        env:
+          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+          GH_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+        run: .github/scripts/install_quartus.sh
+      - name: Fetch pinned APF template and diagnostic reference
+        run: |
+          bash tools/apf/fetch_apf.sh
+          python3 tools/apf/fetch_diagnostic_reference.py --download
+      - name: Stage the project (seed ${{ matrix.seed }})
+        run: python3 tools/pocket/prepare_ps1_project.py --output Pocket/build/ps1 --seed ${{ matrix.seed }}
+      - name: Compile
+        run: |
+          cd Pocket/build/ps1
+          "$QUARTUS_BIN/quartus_sh" --flow compile ap_core 2>&1 | tee compile.log | tail -n 40
+      - name: Timing check
+        id: sta
+        if: ${{ always() }}
+        run: |
+          cd Pocket/build/ps1
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp compile.log "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
+          cp output_files/ap_core.sta.summary output_files/ap_core.fit.summary "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
+          echo ${{ matrix.seed }} > "$GITHUB_WORKSPACE/out/seed.txt"
+          set +e
+          python3 "$GITHUB_WORKSPACE/tools/pocket/check_sta.py" output_files | tee "$GITHUB_WORKSPACE/out/closure.txt"
+          rc=$?
+          set -e
+          if [ $rc -eq 0 ] && [ -f output_files/ap_core.rbf ]; then
+            echo "closed=true" >> "$GITHUB_OUTPUT"
+            cp output_files/ap_core.rbf "$GITHUB_WORKSPACE/out/"
+          elif [ $rc -eq 1 ]; then
+            echo "closed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::seed ${{ matrix.seed }} has negative setup slack"
+          else
+            echo "closed=unknown" >> "$GITHUB_OUTPUT"
+            echo "::warning::seed ${{ matrix.seed }}: STA summary missing or unparseable, inspect artifacts"
+            cp output_files/ap_core.rbf "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
+          fi
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: fit-${{ matrix.seed }}-closed-${{ steps.sta.outputs.closed }}
+          path: out/
+          if-no-files-found: warn
+
+  package:
+    name: Package Pocket core zip
+    needs: fit
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fit-*-closed-true
+          path: fits
+      - name: Pick the closing seed with the best slack
+        run: |
+          ls -R fits || true
+          best=""; bw=-999
+          for d in fits/*/; do
+            [ -f "$d/ap_core.rbf" ] || continue
+            w=$(sed -n 's/.*worst \([-+][0-9.]*\).*/\1/p' "$d/closure.txt" | head -1)
+            if python3 -c "import sys; sys.exit(0 if float('$w') > float('$bw') else 1)"; then best=$d; bw=$w; fi
+          done
+          if [ -z "$best" ]; then echo "::error::No seed closed timing. See the fit-* artifacts."; exit 1; fi
+          echo "best=$best" >> "$GITHUB_ENV"
+          echo "Using $best, seed $(cat $best/seed.txt), worst setup slack $bw"
+      - name: Convert and assemble the Pocket package
+        run: |
+          python3 tools/pocket/convert_rbf_r.py "$best/ap_core.rbf" /tmp/pkg/bitstream.rbf_r
+          cp -r Pocket/dist /tmp/pkgroot
+          mkdir -p /tmp/pkgroot/Cores/pgate1.PlayStation
+          cp /tmp/pkg/bitstream.rbf_r /tmp/pkgroot/Cores/pgate1.PlayStation/bitstream.rbf_r
+          cd /tmp/pkgroot && zip -r "$GITHUB_WORKSPACE/pgate1.PlayStation-${{ github.sha }}-seed$(cat $best/seed.txt).zip" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pocket-ps1-core-${{ github.sha }}
+          path: pgate1.PlayStation-*.zip
