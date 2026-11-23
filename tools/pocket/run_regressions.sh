@@ -76,6 +76,10 @@ out="$WORK/tb_bcd_btoi.vvp"
 run_test bcd_btoi sh -c \
     "iverilog -g2012 -s tb_bcd_btoi -o '$out' bcd_btoi.v tools/pocket/tests/tb_bcd_btoi.sv && vvp -n '$out'"
 
+out="$WORK/tb_pocket_gamepad_ctrl.vvp"
+run_test pocket_gamepad_ctrl sh -c \
+    "iverilog -g2012 -s tb_pocket_gamepad_ctrl -o '$out' Pocket/rtl/pocket_gamepad_ctrl.sv Pocket/tb/tb_pocket_gamepad_ctrl.sv && vvp -n '$out'"
+
 echo
 echo "Logs: $LOG_DIR"
 if [ "$failures" -ne 0 ]; then
