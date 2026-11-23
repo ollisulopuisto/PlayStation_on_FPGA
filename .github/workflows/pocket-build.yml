@@ -13,8 +13,8 @@ on:
   workflow_dispatch:
     inputs:
       seeds:
-        description: Fitter seeds to try, comma-separated (1-8). Small for a first run; widen only if timing does not close.
-        default: "1,2"
+        description: Fitter seeds to try, comma-separated, each 1-8, at most 8. Default is a single-seed proving run; widen only if timing does not close.
+        default: "1"
         required: true
 
 permissions:
@@ -24,6 +24,23 @@ env:
   QUARTUS_CACHE_KEY: quartus-lite-25.1std.0.1129-cyclonev-v1
 
 jobs:
+  validate:
+    name: Validate inputs
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      seeds: ${{ steps.v.outputs.seeds }}
+    steps:
+      - id: v
+        env:
+          SEEDS: ${{ github.event.inputs.seeds }}
+        run: |
+          if ! [[ "$SEEDS" =~ ^[1-8](,[1-8]){0,7}$ ]]; then
+            echo "::error::seeds must be 1-8 comma-separated values, each in 1..8 (got '$SEEDS')"
+            exit 1
+          fi
+          echo "seeds=[$SEEDS]" >> "$GITHUB_OUTPUT"
+
   regressions:
     name: HDL regressions (Icarus)
     runs-on: ubuntu-22.04
@@ -36,6 +53,8 @@ jobs:
           sudo apt-get install -y iverilog
       - name: Run regressions
         run: bash tools/pocket/run_regressions.sh
+      - name: Test the seed-selection flow
+        run: python3 tools/pocket/test_pick_best_seed.py
 
   quartus-cache:
     name: Download and cache Quartus installers
@@ -56,13 +75,13 @@ jobs:
 
   fit:
     name: Stage and compile, seed ${{ matrix.seed }}
-    needs: [regressions, quartus-cache]
+    needs: [validate, regressions, quartus-cache]
     runs-on: ubuntu-22.04
     timeout-minutes: 300
     strategy:
       fail-fast: false
       matrix:
-        seed: ${{ fromJSON(format('[{0}]', github.event.inputs.seeds)) }}
+        seed: ${{ fromJSON(needs.validate.outputs.seeds) }}
     steps:
       - uses: actions/checkout@v4
       - name: Free disk space
@@ -90,12 +109,14 @@ jobs:
         run: python3 tools/pocket/prepare_ps1_project.py --output Pocket/build/ps1 --seed ${{ matrix.seed }}
       - name: Compile
         run: |
+          set -o pipefail
           cd Pocket/build/ps1
           "$QUARTUS_BIN/quartus_sh" --flow compile ap_core 2>&1 | tee compile.log | tail -n 40
       - name: Timing check
         id: sta
         if: ${{ always() }}
         run: |
+          set -o pipefail
           cd Pocket/build/ps1
           mkdir -p "$GITHUB_WORKSPACE/out"
           cp compile.log "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
@@ -132,27 +153,24 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          pattern: fit-*-closed-true
+          pattern: fit-*
           path: fits
+      # pick_best_seed.py only selects dirs with a parseable non-negative
+      # slack and an RBF, so closed=false artifacts never compete; a
+      # closed=unknown artifact with a readable summary can still win, which
+      # is deliberate (recovers from STA-format surprises with eyes on logs).
       - name: Pick the closing seed with the best slack
+        id: pick
         run: |
           ls -R fits || true
-          best=""; bw=-999
-          for d in fits/*/; do
-            [ -f "$d/ap_core.rbf" ] || continue
-            w=$(sed -n 's/.*worst \([-+][0-9.]*\).*/\1/p' "$d/closure.txt" | head -1)
-            if python3 -c "import sys; sys.exit(0 if float('$w') > float('$bw') else 1)"; then best=$d; bw=$w; fi
-          done
-          if [ -z "$best" ]; then echo "::error::No seed closed timing. See the fit-* artifacts."; exit 1; fi
-          echo "best=$best" >> "$GITHUB_ENV"
-          echo "Using $best, seed $(cat $best/seed.txt), worst setup slack $bw"
+          python3 tools/pocket/pick_best_seed.py fits
       - name: Convert and assemble the Pocket package
         run: |
-          python3 tools/pocket/convert_rbf_r.py "$best/ap_core.rbf" /tmp/pkg/bitstream.rbf_r
+          python3 tools/pocket/convert_rbf_r.py "${{ steps.pick.outputs.best_dir }}/ap_core.rbf" /tmp/pkg/bitstream.rbf_r
           cp -r Pocket/dist /tmp/pkgroot
           mkdir -p /tmp/pkgroot/Cores/pgate1.PlayStation
           cp /tmp/pkg/bitstream.rbf_r /tmp/pkgroot/Cores/pgate1.PlayStation/bitstream.rbf_r
-          cd /tmp/pkgroot && zip -r "$GITHUB_WORKSPACE/pgate1.PlayStation-${{ github.sha }}-seed$(cat $best/seed.txt).zip" .
+          cd /tmp/pkgroot && zip -r "$GITHUB_WORKSPACE/pgate1.PlayStation-${{ github.sha }}-seed${{ steps.pick.outputs.best_seed }}.zip" .
       - uses: actions/upload-artifact@v4
         with:
           name: pocket-ps1-core-${{ github.sha }}

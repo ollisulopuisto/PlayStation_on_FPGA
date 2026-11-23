@@ -24,15 +24,8 @@ from pathlib import Path
 ROW = re.compile(r"^\s*;\s*(?P<clock>[^;]+?)\s*;\s*(?P<slack>[-+]?[0-9]+\.[0-9]+)\s*;")
 
 
-def main() -> int:
-    if len(sys.argv) != 2:
-        print(__doc__)
-        return 2
-    out = Path(sys.argv[1])
-    summary = out / "ap_core.sta.summary"
-    if not summary.is_file():
-        print(f"ERROR: {summary} not found")
-        return 2
+def setup_slacks(summary: Path) -> list[tuple[str, float]]:
+    """Parse (clock, slack) pairs from the Setup sections of a .sta.summary."""
     setup = False
     slacks: list[tuple[str, float]] = []
     for line in summary.read_text(errors="replace").splitlines():
@@ -42,6 +35,19 @@ def main() -> int:
         match = ROW.match(line)
         if match and setup:
             slacks.append((match.group("clock"), float(match.group("slack"))))
+    return slacks
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print(__doc__)
+        return 2
+    out = Path(sys.argv[1])
+    summary = out / "ap_core.sta.summary"
+    if not summary.is_file():
+        print(f"ERROR: {summary} not found")
+        return 2
+    slacks = setup_slacks(summary)
     if not slacks:
         print("NO SETUP SLACK PARSED - check output_files/ap_core.sta.summary by hand")
         return 2
