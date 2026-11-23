@@ -2,14 +2,20 @@ name: Pocket PS1 core build
 
 # Stages the Quartus project with tools/pocket/prepare_ps1_project.py and
 # compiles it with Quartus Prime Lite 25.1std (same installer route as
-# ollisulopuisto/MIRLO64). Produces a Pocket package (bitstream.rbf_r) per
-# closing fitter seed. Manual runs only until the route proves itself.
+# ollisulopuisto/MIRLO64). Produces a Pocket package (bitstream.rbf_r) from
+# the best closing fitter seed. Manual runs only until the route proves
+# itself; the seeds input keeps first runs small (default 2 seeds).
 #
 # Requires repo secret ASSETS_TOKEN (release-download token for
 # ollisulopuisto/mirlo64-quartus-assets, same value MIRLO64 uses).
 
 on:
   workflow_dispatch:
+    inputs:
+      seeds:
+        description: Fitter seeds to try, comma-separated (1-8). Small for a first run; widen only if timing does not close.
+        default: "1,2"
+        required: true
 
 permissions:
   contents: read
@@ -56,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        seed: [1, 2, 3, 4, 5, 6, 7, 8]
+        seed: ${{ fromJSON(format('[{0}]', github.event.inputs.seeds)) }}
     steps:
       - uses: actions/checkout@v4
       - name: Free disk space
