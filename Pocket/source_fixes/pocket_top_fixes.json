@@ -5,7 +5,7 @@
     {
       "id": "T1",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "A",
       "why": "author build-dir include path; the private sram_ctrl.h is replaced by the generated sram_ctrl_sfl.h interface of the Pocket/rtl/sram_ctrl.sv shim",
       "old": "%i \"../../../Pocket/sram_ctrl.h\"\n",
@@ -14,16 +14,16 @@
     {
       "id": "T2",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "A",
-      "why": "author build-dir include path; vjtag_uart.h is copied next to the prepared sources",
-      "old": "%i \"../../../hdl/USB-JTAG/DE0-CV/vjtag_uart.h\"\n",
+      "why": "author build-dir include path (renamed by 90dd306 from ../../../hdl/...; same target); vjtag_uart.h is copied next to the prepared sources",
+      "old": "%i \"../hdl/USB-JTAG/DE0-CV/vjtag_uart.h\"\n",
       "new": "%i \"../vjtag_uart.h\"\n"
     },
     {
       "id": "T3",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "A",
       "why": "instance type renamed to the shim around Pocket/rtl/sram_ctrl.sv (whose port names differ from the SFL terminals)",
       "old": "\tsram_ctrl sram;\n",
@@ -32,7 +32,7 @@
     {
       "id": "T4",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "milestone 1 must include sound; upstream Pocket ties the SPU off",
       "old": "psx.sw_reverb_off();\npsx.sw_spu_off();\npsx.sw_spuenv_off();\n",
@@ -41,7 +41,7 @@
     {
       "id": "T5",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "export the SPU mix (PlayStation_core voice_L/R) so the SPU is observable and reaches I2S (docs/POCKET_AUDIO_OUT.md)",
       "old": "\tinput key<16>;\n",
@@ -50,7 +50,7 @@
     {
       "id": "T6",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "SAMPLE_SRC=1 strobe for pocket_audio_out (same gating as psx.run33)",
       "old": "\t\tinstruct dds.run psx.run33();\n",
@@ -59,7 +59,7 @@
     {
       "id": "T7",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "drive the exported mix",
       "old": "\tsdram_ack := sdram_ack_100;\n",
@@ -68,7 +68,7 @@
     {
       "id": "T8",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "restore the commented SPU memory requests on the current sdram_read/sdram_write terminals (sdram_read_L/sdram_write_L no longer exist); the old base 0b000100 overlaps VRAM in the 25-bit map, so 0b0000110 is used",
       "old": "/*\n\t\tpsx.spu_mem_read_req : par{\nhalt(0x95);\n\t\t\tsdram_read_L(0b000100 || psx.spu_mem_A);\n\t\t\tspu_wait_ack := 0b1;\n\t\t}\n\n\t\tpsx.spu_mem_write_req : par{\nhalt(0x96);\n\t\t\tsdram_write_L(0b000100 || psx.spu_mem_A, 0x0000 || psx.spu_mem_Din, 0b0011);\n\t\t\tspu_wait_ack := 0b1;\n\t\t}\n*/\n",
@@ -77,7 +77,7 @@
     {
       "id": "T9",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "restore the commented SPU memory read data/ack path",
       "old": "/*\n\tpsx.spu_mem_Dout = sdram_dout<15:0>;\n\n\tif(spu_wait_ack){\n\t\tif(sdram_ack){\n\t\t\tpsx.spu_mem_ack();\n\t\t\tspu_wait_ack := 0b0;\n\t\t}\n\t}\n*/\n",
@@ -212,7 +212,7 @@
     {
       "id": "T10",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "Q-L1-16 top-level debug bits input (core_top sdram_dbg), read only by debug overlays",
       "old": "\tinput target_dataslot_read, ram_reloading;\n",
@@ -221,7 +221,7 @@
     {
       "id": "T11",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "The GPU/SPU SDRAM requests (alt) were issued whenever the registered ack was high, independently of the CPU requests (WRAM_READ/WRAM_WRITE/BIOS_READ instructs), so both could strobe in the same cycle and their sdram_read/sdram_write arguments were ORed. Upstream shipped with the SPU off (its SPU path halted with 0x95/0x96); with the Q-L1-14 SPU-in-SDRAM path every sound-on build ran away during the BIOS (hardware r16, r19b, r26-r29: PC ~0x80A81C2x), sound-off r13 booted. The boot bench gave the CPU priority, so it never showed this. The GPU/SPU request now waits while a CPU strobe is present.",
       "old": "\t\tgpu_read_wait_ack | gpu_write_wait_ack | \n\t\tspu_wait_ack | ^sdram_ack : ;\n",
@@ -230,7 +230,7 @@
     {
       "id": "T12a",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "Q-L1-16 T12 (found by the full-chain simulation Pocket/sim/fullchain, commit 5928005): the CPU SDRAM commands (psx.WRAM_READ/WRAM_WRITE/BIOS_READ) were strobed regardless of sdram_ack. One arriving while an SPU/GPU command was in flight was dropped by the adapter, and `if(sdram_ack) psx.wram_ack()/bios_ack()` then handed the other command's completion and stale dout to the CPU; with the SPU on (first SPU-RAM write of the BIOS SPU init) this ran the PC away to 0x80A81C20, as on hardware r16-r30. The CPU command is now held in cpu_pend_* while a GPU/SPU command is in flight and issued when it completes; the ack level reaches the CPU only while no GPU/SPU command is in flight and no CPU command is held. Simulated 14 s: BIOS logo and shell, 0 dropped, 0 scoreboard mismatches.",
       "old": "\n\tinstruct psx.WRAM_READ par{\n\t\tany{\n\t\t\t(psx.Word==1) | (psx.Word==2) : par{\n\t\t\t\tsdram_read(0b00000 || psx.A<20:1>, 1);\n\t\t\t}\n\t\t\telse : par{// byte 16,12,8,4 -> burst 8,6,4,2\n\t\t\t\tsdram_read(0b00000 || psx.A<20:2> || 0b0, psx.Word<4:1>);\n\t\t\t}\n",
@@ -239,7 +239,7 @@
     {
       "id": "T12b",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "part of T12 (see T12a)",
       "old": "\t}\n\tif(sdram_ack) psx.wram_ack();\n\n",
@@ -248,7 +248,7 @@
     {
       "id": "T12c",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "part of T12 (see T12a)",
       "old": "\t\t\tpsx.Word==1 : any{ // psx.Dout<7:0>\n\t\t\t\tpsx.A<0>==0b0 : sdram_write(0b00000 || psx.A<20:1>,  128#psx.Dout      , 0x0001, 1);\n\t\t\t\tpsx.A<0>==0b1 : sdram_write(0b00000 || psx.A<20:1>, (128#psx.Dout) << 8, 0x0002, 1);\n\t\t\t}\n\t\t\tpsx.Word==2 : par{ // psx.Dout<15:0>\n\t\t\t\tsdram_write(0b00000 || psx.A<20:1>, 128#psx.Dout, 0x0003, 1);\n\t\t\t}\n\t\t\telse/*psx.Word==4*/ : sdram_write(0b00000 || psx.A<20:2> || 0b0, 128#psx.Dout, 0x000F, 2);\n\t\t}\n",
@@ -257,7 +257,7 @@
     {
       "id": "T12d",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "part of T12 (see T12a)",
       "old": "\t\t\t(psx.Word==1) | (psx.Word==2) : par{\n\t\t\t\tsdram_read(0b0100000 || psx.A<18:1>, 1);\n\t\t\t}\n\t\t\telse : par{// byte 4 -> burst 2\n\t\t\t\tsdram_read(0b0100000 || psx.A<18:2> || 0b0, 2);//psx.Word<4:1>);\n\t\t\t}\n",
@@ -266,7 +266,7 @@
     {
       "id": "T12e",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "part of T12 (see T12a)",
       "old": "\t}\n\tif(sdram_ack) psx.bios_ack();\n\n",
@@ -275,7 +275,7 @@
     {
       "id": "T12f",
       "file": "Pocket/core.sflp",
-      "upstream_sha256": "eae06396af663b6f20c56c7171a3d4a2ba4487f1cd2db7607ea9862181d69ef6",
+      "upstream_sha256": "d8498cbfb65d04f00c1ef299babd208109f269e2c5344f089a411af20bf97bd0",
       "class": "B",
       "why": "part of T12 (see T12a)",
       "old": "\t\tspu_wait_ack | ^sdram_ack |\n\t\tpsx.WRAM_READ | psx.WRAM_WRITE | psx.BIOS_READ : ; // Q-L1-16: a CPU strobe owns the cycle\n\n",
@@ -888,19 +888,19 @@
     {
       "source": "hdl/USB-JTAG/DE0-CV/vjtag_uart.v",
       "dest": "rtl/vjtag_uart.v",
-      "sha256": "aca8cb0644d79123d993bb8460fe997bca0b3784c44e285935ecc66e1c4d6ae5",
+      "sha256": "67bf79eb5a7096bd72a50cb971edd8bf5023b55330b6079d609331b9afeb8344",
       "owner": "USB-JTAG import (untracked)"
     },
     {
       "source": "hdl/USB-JTAG/DE0-CV/VirtualJTAG.v",
       "dest": "rtl/VirtualJTAG.v",
-      "sha256": "e26ecf548267882ac02cb6c62d92123c95f7292f98a0ac864bd1604711e70de8",
+      "sha256": "3c663876581167fbe8af8ccac948f2c26a10816e4e62ff506cbd500cf0e9e057",
       "owner": "USB-JTAG import (untracked)"
     },
     {
       "source": "hdl/USB-JTAG/DE0-CV/vjtag_uart.h",
       "dest": "sfl/vjtag_uart.h",
-      "sha256": "e2ccf5e6d27e7d61f5098ee55c2dc4ae12ac8ee5ced0b87c290e1b5df6901a71",
+      "sha256": "e0a8975419f13f58b480b14ed022d29da77528133ce3787e30bdf12b5de8d7ff",
       "owner": "USB-JTAG import (untracked)"
     }
   ]
