@@ -104,7 +104,7 @@
     {
       "id": "C1",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "B",
       "why": "the replacement controller takes commands in the core clock domain",
       "old": "synch_3 s3(ram1_word_wr, word_wr_s, dram_ctrl_clk, word_wr_r);\n",
@@ -113,7 +113,7 @@
     {
       "id": "C2",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "A",
       "why": "set_bram is commented out in core.sflp; connect the exported audio",
       "old": "\t\t.set_sdram(set_sdram), .set_bram(set_bram), .set_sram(set_sram),\n",
@@ -122,7 +122,7 @@
     {
       "id": "C3",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "A",
       "why": "bram ports are commented out in core.sflp",
       "old": "\t\t.bram_word_wr(ram_word_wr_hold_r), .bram_wdata(ram1_word_data),\n",
@@ -131,7 +131,7 @@
     {
       "id": "C4",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "A",
       "why": "declarations for the new connections; set_bram has no driver once the bram port is gone",
       "old": "\tcore CU (\n",
@@ -140,7 +140,7 @@
     {
       "id": "C5",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "B",
       "why": "pads owned by the MIRLO64 PHY",
       "old": "\tassign dram_cke = 1'b1;\n\tassign dram_dq = dram_Din_En==1'b0 ? dram_Din : 16'hzzzz;\n",
@@ -149,7 +149,7 @@
     {
       "id": "C6",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "B",
       "why": "missing author-private module",
       "old": "\tsdram128_burstn_ctrl_100 sdram_ctrl_inst (\n\t\t.p_reset(~pll_core_locked),\n\t\t.m_clock(dram_ctrl_clk),\n\t\t.RASn(dram_ras_n),\n\t\t.CASn(dram_cas_n),\n\t\t.WEn(dram_we_n),\n\t\t.DQM(dram_dqm),\n\t\t.DEn(dram_Din_En),\n\t\t.BA(dram_ba),\n\t\t.A(dram_a),\n\t\t.Din(dram_Din),\n\t\t.Dout(dram_dq),\n\n\t\t.write(sdram_write),\n\t\t.adrs(sdram_adrs),\n\t\t.din(sdram_din),\n\t\t.enable(sdram_enable),\n\t\t.burst(sdram_burst),\n\t\t.read(sdram_read),\n\t\t.dout(sdram_dout),\n\t\t.manual_refresh(1'b0),\n\t\t.refresh_go(1'b0),\n\t\t.ack(sdram_ack_100)\n\t);\n",
@@ -158,7 +158,7 @@
     {
       "id": "C7",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "B",
       "why": "sdr_phy drives the SDRAM clock pin through ALTDDIO_OUT from this source",
       "old": "\t\t.outclk_2(dram_clk),\n",
@@ -167,7 +167,7 @@
     {
       "id": "C8",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "B",
       "why": "replace the template silence generator, per docs/POCKET_AUDIO_OUT.md integration notes",
       "old": "//\n// audio i2s silence generator\n// see other examples for actual audio generation\n//\n\nassign audio_mclk = audgen_mclk;\nassign audio_dac = audgen_dac;\nassign audio_lrck = audgen_lrck;\n\n// generate MCLK = 12.288mhz with fractional accumulator\n    reg         [21:0]  audgen_accum;\n    reg                 audgen_mclk;\n    parameter   [20:0]  CYCLE_48KHZ = 21'd122880 * 2;\nalways @(posedge clk_74a) begin\n    audgen_accum <= audgen_accum + CYCLE_48KHZ;\n    if(audgen_accum >= 21'd742500) begin\n        audgen_mclk <= ~audgen_mclk;\n        audgen_accum <= audgen_accum - 21'd742500 + CYCLE_48KHZ;\n    end\nend\n\n// generate SCLK = 3.072mhz by dividing MCLK by 4\n    reg [1:0]   aud_mclk_divider;\n    wire        audgen_sclk = aud_mclk_divider[1] ;// synthesis keep;\n    reg         audgen_lrck_1;\nalways @(posedge audgen_mclk) begin\n    aud_mclk_divider <= aud_mclk_divider + 1'b1;\nend\n\n// shift out audio data as I2S \n// 32 total bits per channel, but only 16 active bits at the start and then 16 dummy bits\n//\n    reg     [4:0]   audgen_lrck_cnt;    \n    reg             audgen_lrck;\n    reg             audgen_dac;\nalways @(negedge audgen_sclk) begin\n    audgen_dac <= 1'b0;\n    // 48khz * 64\n    audgen_lrck_cnt <= audgen_lrck_cnt + 1'b1;\n    if(audgen_lrck_cnt == 31) begin\n        // switch channels\n        audgen_lrck <= ~audgen_lrck;\n        \n    end \nend\n\n\n",
@@ -176,7 +176,7 @@
     {
       "id": "C9",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "B",
       "why": "r9-r12 on hardware: the CPU ran garbage at varying places. The loader strobe ram1_word_wr is one clk_74a cycle (13.5 ns); upstream synchronised it into the 100 MHz controller clock, Q-L1-14 into clk_50 (20 ns, 25 ns at 40 MHz), so about a third to a half of the BIOS words were never written. Dual-clock FIFO (pocket_audio_afifo, 512 x 56) instead of synch_3.",
       "old": "    wire word_wr_s, word_wr_r;\nsynch_3 s3(ram1_word_wr, word_wr_s, clk_50, word_wr_r); // Q-L1-14: adapter command side runs on clk_50\n",
@@ -185,7 +185,7 @@
     {
       "id": "C10",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "B",
       "why": "r9-r12 on hardware: the CPU ran garbage at varying places. The loader strobe ram1_word_wr is one clk_74a cycle (13.5 ns); upstream synchronised it into the 100 MHz controller clock, Q-L1-14 into clk_50 (20 ns, 25 ns at 40 MHz), so about a third to a half of the BIOS words were never written. Command mux: FIFO head when ldf_go, else the core; the core sees ack only with the FIFO empty.",
       "old": "\tassign sdram_write = word_wr_r | core_sdram_write;\n\tassign sdram_adrs = (word_wr_r ? {ram1_word_addr, 1'b0} : 25'b0) | ((core_sdram_write | core_sdram_read) ? core_sdram_adrs : 25'b0);\n\tassign sdram_din = (word_wr_r ? {96'b0, ram1_word_data} : 128'b0) | (core_sdram_write ? core_sdram_din : 128'b0);\n\tassign sdram_enable = (word_wr_r ? 16'h000F : 16'b0) | (core_sdram_write ? core_sdram_enable : 16'b0);\n\tassign sdram_burst = (word_wr_r ? 2 : 0) | ((core_sdram_write | core_sdram_read) ? core_sdram_burst : 0);\n\tassign sdram_read = core_sdram_read;\n",
@@ -194,7 +194,7 @@
     {
       "id": "C11",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "B",
       "why": "r9-r12 on hardware: the CPU ran garbage at varying places. The loader strobe ram1_word_wr is one clk_74a cycle (13.5 ns); upstream synchronised it into the 100 MHz controller clock, Q-L1-14 into clk_50 (20 ns, 25 ns at 40 MHz), so about a third to a half of the BIOS words were never written. Adapter ack/ready/debug outputs for the loader FIFO arbiter.",
       "old": "\t\t.ack(sdram_ack_100), .dropped(), .stray(),\n",
@@ -203,7 +203,7 @@
     {
       "id": "C12",
       "file": "Pocket/core_top.v",
-      "upstream_sha256": "737dfd1c4630b7cfa0e464eb5b6420f404f0f403ff71b31a53674b0931fc87f2",
+      "upstream_sha256": "4826bba49d8e685dabf28824d6ed7a571205c8dc38f83ec16d75bbe903fbbe65",
       "class": "B",
       "why": "Q-L1-16 top-level debug bits into the core (used only by debug overlays).",
       "old": "\t\t.target_dataslot_read(target_dataslot_read_s), .ram_reloading(ram_reloading_s)\n",

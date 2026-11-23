@@ -618,6 +618,17 @@ synch_3 swrhold(|ram_word_wr_hold, ram_word_wr_hold_s, clk_50, ram_word_wr_hold_
 	wire [15:0] key_s;
 synch_3 #(.WIDTH(16)) synch_controler(cont1_key[15:0], key_s, clk_50);
 
+	wire [15:0] key_mapped;
+	wire [1:0] ctrl_mode_l, ctrl_mode_r;
+pocket_gamepad_ctrl gamepad_ctrl (
+	.clk(clk_50),
+	.reset_n(reset_n),
+	.key_in(key_s),
+	.key_out(key_mapped),
+	.mode_l(ctrl_mode_l),
+	.mode_r(ctrl_mode_r)
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////
 
 	wire [15:0] dram_Din;
@@ -639,7 +650,7 @@ synch_3 #(.WIDTH(16)) synch_controler(cont1_key[15:0], key_s, clk_50);
 		.p_reset(~reset_n),
 		.m_clock(clk_50),
 //--------------------- Pad --------------------------------
-		.key(key_s),
+		.key(key_mapped),
 //--------------------- SDRAM Interface --------------------
 		.sdram_write(core_sdram_write), .sdram_adrs(core_sdram_adrs), .sdram_din(core_sdram_din),
 		.sdram_enable(core_sdram_enable), .sdram_burst(core_sdram_burst),
