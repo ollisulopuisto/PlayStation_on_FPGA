@@ -1,0 +1,177 @@
+name: Pocket PS1 core build
+
+# Stages the Quartus project with tools/pocket/prepare_ps1_project.py and
+# compiles it with Quartus Prime Lite 25.1std (same installer route as
+# ollisulopuisto/MIRLO64). Produces a Pocket package (bitstream.rbf_r) from
+# the best closing fitter seed. Manual runs only until the route proves
+# itself; the seeds input keeps first runs small (default 1 seed).
+#
+# Requires repo secret ASSETS_TOKEN (release-download token for
+# ollisulopuisto/mirlo64-quartus-assets, same value MIRLO64 uses).
+
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Fitter seeds to try, comma-separated, each 1-8, at most 8. Default is a single-seed proving run; widen only if timing does not close.
+        default: "1"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  QUARTUS_CACHE_KEY: quartus-lite-25.1std.0.1129-cyclonev-v1
+
+jobs:
+  validate:
+    name: Validate inputs
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      seeds: ${{ steps.v.outputs.seeds }}
+    steps:
+      - id: v
+        env:
+          SEEDS: ${{ github.event.inputs.seeds }}
+        run: |
+          if ! [[ "$SEEDS" =~ ^[1-8](,[1-8]){0,7}$ ]]; then
+            echo "::error::seeds must be 1-8 comma-separated values, each in 1..8 (got '$SEEDS')"
+            exit 1
+          fi
+          echo "seeds=[$SEEDS]" >> "$GITHUB_OUTPUT"
+
+  regressions:
+    name: HDL regressions (Icarus)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Run regressions
+        run: bash tools/pocket/run_regressions.sh
+      - name: Test the seed-selection flow
+        run: python3 tools/pocket/test_pick_best_seed.py
+
+  quartus-cache:
+    name: Download and cache Quartus installers
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - id: c
+        uses: actions/cache@v4
+        with:
+          path: ~/quartus-dl
+          key: ${{ env.QUARTUS_CACHE_KEY }}
+      - name: Download installers on cache miss
+        if: steps.c.outputs.cache-hit != 'true'
+        env:
+          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+          GH_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+        run: DOWNLOAD_ONLY=1 .github/scripts/install_quartus.sh  # gh CLI is preinstalled on hosted runners
+
+  fit:
+    name: Stage and compile, seed ${{ matrix.seed }}
+    needs: [validate, regressions, quartus-cache]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: ${{ fromJSON(needs.validate.outputs.seeds) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libtinfo5 libncurses5 libpng16-16 libfreetype6 libsm6 libxrender1 libxext6 libxtst6 libxi6 libxft2 locales
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/quartus-dl
+          key: ${{ env.QUARTUS_CACHE_KEY }}
+      - name: Install Quartus Lite 25.1std
+        env:
+          ASSETS_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+          GH_TOKEN: ${{ secrets.ASSETS_TOKEN }}
+        run: .github/scripts/install_quartus.sh
+      - name: Fetch pinned APF template and diagnostic reference
+        run: |
+          bash tools/apf/fetch_apf.sh
+          python3 tools/apf/fetch_diagnostic_reference.py --download
+      - name: Stage the project (seed ${{ matrix.seed }})
+        run: python3 tools/pocket/prepare_ps1_project.py --output Pocket/build/ps1 --seed ${{ matrix.seed }}
+      - name: Compile
+        run: |
+          set -o pipefail
+          cd Pocket/build/ps1
+          "$QUARTUS_BIN/quartus_sh" --flow compile ap_core 2>&1 | tee compile.log | tail -n 40
+      - name: Timing check
+        id: sta
+        if: ${{ always() }}
+        run: |
+          set -o pipefail
+          cd Pocket/build/ps1
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp compile.log "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
+          cp output_files/ap_core.sta.summary output_files/ap_core.fit.summary "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
+          echo ${{ matrix.seed }} > "$GITHUB_WORKSPACE/out/seed.txt"
+          set +e
+          python3 "$GITHUB_WORKSPACE/tools/pocket/check_sta.py" output_files | tee "$GITHUB_WORKSPACE/out/closure.txt"
+          rc=$?
+          set -e
+          if [ $rc -eq 0 ] && [ -f output_files/ap_core.rbf ]; then
+            echo "closed=true" >> "$GITHUB_OUTPUT"
+            cp output_files/ap_core.rbf "$GITHUB_WORKSPACE/out/"
+          elif [ $rc -eq 1 ]; then
+            echo "closed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::seed ${{ matrix.seed }} has negative setup slack"
+          else
+            echo "closed=unknown" >> "$GITHUB_OUTPUT"
+            echo "::warning::seed ${{ matrix.seed }}: STA summary missing or unparseable, inspect artifacts"
+            cp output_files/ap_core.rbf "$GITHUB_WORKSPACE/out/" 2>/dev/null || true
+          fi
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: fit-${{ matrix.seed }}-closed-${{ steps.sta.outputs.closed }}
+          path: out/
+          if-no-files-found: warn
+
+  package:
+    name: Package Pocket core zip
+    needs: fit
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fit-*
+          path: fits
+      # pick_best_seed.py only selects dirs with a parseable non-negative
+      # slack and an RBF, so closed=false artifacts never compete; a
+      # closed=unknown artifact with a readable summary can still win, which
+      # is deliberate (recovers from STA-format surprises with eyes on logs).
+      - name: Pick the closing seed with the best slack
+        id: pick
+        run: |
+          ls -R fits || true
+          python3 tools/pocket/pick_best_seed.py fits
+      - name: Convert and assemble the Pocket package
+        run: |
+          python3 tools/pocket/convert_rbf_r.py "${{ steps.pick.outputs.best_dir }}/ap_core.rbf" /tmp/pkg/bitstream.rbf_r
+          cp -r Pocket/dist /tmp/pkgroot
+          mkdir -p /tmp/pkgroot/Cores/pgate1.PlayStation
+          cp /tmp/pkg/bitstream.rbf_r /tmp/pkgroot/Cores/pgate1.PlayStation/bitstream.rbf_r
+          cd /tmp/pkgroot && zip -r "$GITHUB_WORKSPACE/pgate1.PlayStation-${{ github.sha }}-seed${{ steps.pick.outputs.best_seed }}.zip" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pocket-ps1-core-${{ github.sha }}
+          path: pgate1.PlayStation-*.zip
